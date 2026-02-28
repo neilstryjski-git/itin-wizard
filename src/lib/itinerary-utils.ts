@@ -43,6 +43,10 @@ export function formatDate(dateStr: string): string {
   }
 }
 
+export function googleMapsUrl(location: string): string {
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`;
+}
+
 export function formatTime(time?: string): string {
   if (!time) return '';
   const [h, m] = time.split(':').map(Number);

@@ -11,7 +11,7 @@ import { useProjectsContext } from '@/contexts/ProjectsContext';
 import { ItineraryEvent, TravelLink } from '@/types/project';
 import {
   EVENT_EMOJI, EVENT_TYPE_LABELS, formatDate, formatTime,
-  buildEventTable, getEventTitle, buildTimeline,
+  buildEventTable, getEventTitle, buildTimeline, googleMapsUrl,
 } from '@/lib/itinerary-utils';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -318,8 +318,10 @@ export default function ExportPreview() {
                           }
 
                           // Display mode
-                          const detailContent = fieldUrl ? (
-                            <a href={fieldUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline inline-flex items-center gap-0.5">
+                          const isLocationField = ['Location', 'Departure', 'Arrival'].includes(row.field);
+                          const effectiveUrl = fieldUrl || (isLocationField && row.details ? googleMapsUrl(row.details) : '');
+                          const detailContent = effectiveUrl ? (
+                            <a href={effectiveUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline inline-flex items-center gap-0.5">
                               {row.details} <ExternalLink className="h-2.5 w-2.5 shrink-0" />
                             </a>
                           ) : (

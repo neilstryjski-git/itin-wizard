@@ -10,7 +10,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useProjectsContext } from '@/contexts/ProjectsContext';
-import { ItineraryEvent, TravelLink } from '@/types/project';
+import { ItineraryEvent, TravelLink, FileAttachment } from '@/types/project';
+import { FileDropZone, AttachmentList } from '@/components/FileDropZone';
 
 const EVENT_ICONS: Record<string, any> = {
   'flight-departure': Plane,
@@ -109,6 +110,30 @@ export default function Phase2Itinerary() {
   const cancelEdit = () => { setEditingId(null); setEditForm({}); };
 
   const hasMissing = (e: ItineraryEvent) => !e.time || e.links.length === 0;
+
+  const addAttachments = (eventId: string, files: FileAttachment[]) => {
+    updateProject(projectId!, p => ({
+      ...p,
+      phase_2_itinerary: {
+        ...p.phase_2_itinerary,
+        events: p.phase_2_itinerary.events.map(e =>
+          e.id === eventId ? { ...e, attachments: [...(e.attachments || []), ...files] } : e
+        ),
+      },
+    }));
+  };
+
+  const removeAttachment = (eventId: string, attachmentId: string) => {
+    updateProject(projectId!, p => ({
+      ...p,
+      phase_2_itinerary: {
+        ...p.phase_2_itinerary,
+        events: p.phase_2_itinerary.events.map(e =>
+          e.id === eventId ? { ...e, attachments: (e.attachments || []).filter(a => a.id !== attachmentId) } : e
+        ),
+      },
+    }));
+  };
 
   return (
     <div className="p-6 md:p-10 max-w-3xl mx-auto fade-in">
@@ -231,8 +256,16 @@ export default function Phase2Itinerary() {
                           </div>
                         )}
                         {event.notes && <p className="text-xs mt-2 text-muted-foreground italic">{event.notes}</p>}
+                        <AttachmentList
+                          attachments={event.attachments || []}
+                          onRemove={(attId) => removeAttachment(event.id, attId)}
+                        />
                       </div>
                       <div className="flex gap-1 shrink-0">
+                        <FileDropZone
+                          compact
+                          onFilesAdded={(files) => addAttachments(event.id, files)}
+                        />
                         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => startEdit(event)}>
                           <Pencil className="h-3.5 w-3.5" />
                         </Button>
@@ -331,6 +364,20 @@ function EditForm({
             </Button>
           </div>
         ))}
+      </div>
+      <div>
+        <label className="text-xs font-medium text-muted-foreground">Attachments</label>
+        <div className="mt-1">
+          <FileDropZone onFilesAdded={(files) => {
+            setForm({ ...form, attachments: [...(form.attachments || []), ...files] });
+          }} />
+        </div>
+        <AttachmentList
+          attachments={form.attachments || []}
+          onRemove={(attId) => {
+            setForm({ ...form, attachments: (form.attachments || []).filter(a => a.id !== attId) });
+          }}
+        />
       </div>
       <div className="flex gap-2">
         <Button size="sm" onClick={onSave} className="gap-1"><Save className="h-3 w-3" /> Save</Button>

@@ -25,12 +25,16 @@ export interface RequirementItem {
 
 export interface ItineraryEvent {
   id: string;
-  type: 'flight-departure' | 'flight-arrival' | 'check-in' | 'check-out' | 'activity' | 'transfer' | 'accommodation';
+  type: 'flight' | 'check-in' | 'check-out' | 'activity' | 'transfer' | 'accommodation';
   title: string;
   date: string;
   endDate?: string;
   time?: string;
   location?: string;
+  departureLocation?: string;
+  arrivalLocation?: string;
+  departureTime?: string;
+  arrivalTime?: string;
   notes?: string;
   links: TravelLink[];
   confirmationCode?: string;

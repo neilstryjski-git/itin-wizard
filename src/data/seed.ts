@@ -79,11 +79,13 @@ export const SEED_PROJECT: TravelProject = {
     events: [
       {
         id: 'evt_001',
-        type: 'flight-departure',
-        title: 'Flight to Belize',
+        type: 'flight',
+        title: 'Toronto → Belize City',
         date: '2026-03-10',
-        time: '23:55',
-        location: 'YYZ (Toronto)',
+        departureLocation: 'YYZ (Toronto)',
+        departureTime: '23:55',
+        arrivalLocation: 'BZE (Belize City)',
+        arrivalTime: '04:30',
         flightNumber: 'AC1234',
         confirmationCode: 'XJ882K',
         links: [

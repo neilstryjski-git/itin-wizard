@@ -9,12 +9,16 @@ const corsHeaders = {
 const systemPrompt = `You are a travel itinerary parser. Given raw reservation/booking text and/or document images, extract structured events.
 
 Return a JSON array of events. Each event object has these fields:
-- type: one of "flight-departure", "flight-arrival", "accommodation", "activity", "transfer"
-- title: short descriptive title
-- date: ISO date string YYYY-MM-DD (check-in or departure date)
+- type: one of "flight", "accommodation", "activity", "transfer"
+- title: short descriptive title (for flights use "Origin → Destination" format, e.g. "Toronto → Belize City")
+- date: ISO date string YYYY-MM-DD (departure date for flights, check-in for accommodation)
 - endDate: ISO date string YYYY-MM-DD (only for accommodation, the check-out date)
-- time: HH:MM in 24h format if available
-- location: city, airport code, or venue name
+- departureLocation: departure city/airport (flights only)
+- departureTime: HH:MM in 24h format departure time (flights only)
+- arrivalLocation: arrival city/airport (flights only)
+- arrivalTime: HH:MM in 24h format arrival time (flights only)
+- time: HH:MM in 24h format if available (non-flight events)
+- location: city, airport code, or venue name (non-flight events)
 - address: street address if available
 - confirmationCode: booking reference / PNR if found
 - flightNumber: airline code + number (e.g. AC1234) if applicable
@@ -22,8 +26,8 @@ Return a JSON array of events. Each event object has these fields:
 - links: array of {label, url} if URLs are present
 
 Rules:
+- For flights, create ONE event per flight with type "flight". A flight from Toronto to Belize is a single event, not separate departure/arrival events. Include departureLocation, departureTime, arrivalLocation, arrivalTime.
 - For hotels/resorts/stays, use type "accommodation" with date (check-in) and endDate (check-out). Do NOT split into separate check-in/check-out events.
-- For flights, create the appropriate event type (flight-departure or flight-arrival). You can keep them as sequential events.
 - Omit fields that have no data (don't include null or empty strings).
 - If you cannot determine a date, use today's date.
 - Be thorough: extract every piece of useful information from all provided documents and text.
@@ -42,10 +46,14 @@ const toolDef = {
           items: {
             type: "object",
             properties: {
-              type: { type: "string", enum: ["flight-departure", "flight-arrival", "accommodation", "activity", "transfer"] },
+              type: { type: "string", enum: ["flight", "accommodation", "activity", "transfer"] },
               title: { type: "string" },
               date: { type: "string" },
               endDate: { type: "string" },
+              departureLocation: { type: "string" },
+              departureTime: { type: "string" },
+              arrivalLocation: { type: "string" },
+              arrivalTime: { type: "string" },
               time: { type: "string" },
               location: { type: "string" },
               address: { type: "string" },

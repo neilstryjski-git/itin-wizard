@@ -1,4 +1,46 @@
+import { parse, format, isValid } from 'date-fns';
 import { ItineraryEvent, TravelLink } from '@/types/project';
+
+/**
+ * Normalize any date string to YYYY-MM-DD for reliable sorting.
+ * Handles ISO, DD/MM/YYYY, MM/DD/YYYY, DD/MM/YY, free-text, etc.
+ */
+export function normalizeDate(value: string | undefined | null): string {
+  if (!value || !value.trim()) return '';
+  const trimmed = value.trim();
+
+  // Already YYYY-MM-DD (possibly with single-digit month/day like 2026-3-1)
+  const isoMatch = trimmed.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (isoMatch) {
+    return `${isoMatch[1]}-${isoMatch[2].padStart(2, '0')}-${isoMatch[3].padStart(2, '0')}`;
+  }
+
+  // Try date-fns parsing with common formats
+  const formats = [
+    'dd/MM/yyyy',
+    'MM/dd/yyyy',
+    'yyyy-MM-dd',
+    'dd/MM/yy',
+    'MM/dd/yy',
+    'yyyy/MM/dd',
+    'dd-MM-yyyy',
+    'MM-dd-yyyy',
+  ];
+  for (const fmt of formats) {
+    const parsed = parse(trimmed, fmt, new Date());
+    if (isValid(parsed) && parsed.getFullYear() > 1000) {
+      return format(parsed, 'yyyy-MM-dd');
+    }
+  }
+
+  // Fallback: native Date parsing (handles "March 15, 2026" etc.)
+  const d = new Date(trimmed);
+  if (!isNaN(d.getTime()) && d.getFullYear() > 1000) {
+    return format(d, 'yyyy-MM-dd');
+  }
+
+  return trimmed; // Can't parse, return as-is
+}
 
 export const EVENT_EMOJI: Record<string, string> = {
   'flight': '✈',
@@ -22,8 +64,9 @@ export function formatDate(dateStr: string): string {
   if (!dateStr) return '';
   try {
     const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    // Try parsing as YYYY-MM-DD first
-    const parts = dateStr.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+    // Normalize first to ensure consistent YYYY-MM-DD
+    const normalized = normalizeDate(dateStr);
+    const parts = normalized.match(/^(\d{4})-(\d{2})-(\d{2})$/);
     if (parts) {
       const d = new Date(Number(parts[1]), Number(parts[2]) - 1, Number(parts[3]));
       const day = d.getDate().toString().padStart(2, '0');
@@ -31,13 +74,7 @@ export function formatDate(dateStr: string): string {
       const year = d.getFullYear().toString().slice(-2);
       return `${day}/${month}/${year} (${days[d.getDay()]})`;
     }
-    // Fallback: try native Date parsing for free-text dates like "March 15, 2026"
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return dateStr; // Can't parse, return as-is
-    const day = d.getDate().toString().padStart(2, '0');
-    const month = (d.getMonth() + 1).toString().padStart(2, '0');
-    const year = d.getFullYear().toString().slice(-2);
-    return `${day}/${month}/${year} (${days[d.getDay()]})`;
+    return dateStr; // Can't parse, return as-is
   } catch {
     return dateStr;
   }
@@ -179,41 +216,41 @@ export interface TimelineEntry {
 export function buildTimeline(events: ItineraryEvent[]): TimelineEntry[] {
   const entries: TimelineEntry[] = [];
   for (const ev of events) {
+    // Normalize dates for reliable sorting
+    const normDate = normalizeDate(ev.date);
+    const normEndDate = normalizeDate(ev.endDate);
+
     if (ev.type === 'accommodation') {
-      // Expand into check-in and check-out bookends
       entries.push({
-        event: ev, displayType: 'check-in', displayDate: ev.date,
+        event: ev, displayType: 'check-in', displayDate: normDate,
         displayTime: ev.time || '15:00', isBookend: 'check-in',
       });
-      if (ev.endDate && ev.endDate !== ev.date) {
+      if (normEndDate && normEndDate !== normDate) {
         entries.push({
-          event: ev, displayType: 'check-out', displayDate: ev.endDate,
+          event: ev, displayType: 'check-out', displayDate: normEndDate,
           displayTime: '11:00', isBookend: 'check-out',
         });
       }
     } else if (ev.type === 'check-in') {
       entries.push({
-        event: ev, displayType: 'check-in', displayDate: ev.date,
+        event: ev, displayType: 'check-in', displayDate: normDate,
         displayTime: ev.time || '15:00', isBookend: 'check-in',
       });
     } else if (ev.type === 'check-out') {
       entries.push({
-        event: ev, displayType: 'check-out', displayDate: ev.date,
+        event: ev, displayType: 'check-out', displayDate: normDate,
         displayTime: ev.time || '11:00', isBookend: 'check-out',
       });
     } else if (ev.type === 'flight') {
-      entries.push({ event: ev, displayType: 'flight', displayDate: ev.date, displayTime: ev.departureTime });
+      entries.push({ event: ev, displayType: 'flight', displayDate: normDate, displayTime: ev.departureTime });
     } else {
-      entries.push({ event: ev, displayType: ev.type, displayDate: ev.date, displayTime: ev.time });
+      entries.push({ event: ev, displayType: ev.type, displayDate: normDate, displayTime: ev.time });
     }
   }
 
-  // Sort chronologically by date then time.
-  // Events missing a time get a sensible default so they don't cluster at midnight.
+  // Sort chronologically by normalized date then time.
   const defaultTime = (e: TimelineEntry): string => {
     if (e.displayTime) return e.displayTime;
-    // No time specified — place in the middle of the day so it falls between
-    // morning check-outs/flights and afternoon check-ins.
     return '12:00';
   };
 

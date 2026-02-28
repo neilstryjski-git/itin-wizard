@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import {
   Pencil, Save, X, AlertTriangle, Plus, Trash2, Plane, Hotel,
   MapPin, Clock, Link as LinkIcon, FileText, ArrowRight, Loader2, Sparkles, Check,
+  Upload, Image, File,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -45,13 +46,31 @@ export default function Phase2Itinerary() {
   const [editForm, setEditForm] = useState<Partial<ItineraryEvent>>({});
   const [isParsing, setIsParsing] = useState(false);
   const [previewEvents, setPreviewEvents] = useState<Partial<ItineraryEvent>[]>([]);
+  const [uploadedDocs, setUploadedDocs] = useState<FileAttachment[]>([]);
 
-  const parseAndAddCb = useCallback(async () => {
-    if (!rawInput.trim() || !projectId) return;
+  const handleDocsAdded = useCallback((files: FileAttachment[]) => {
+    setUploadedDocs(prev => [...prev, ...files]);
+  }, []);
+
+  const removeDoc = useCallback((id: string) => {
+    setUploadedDocs(prev => prev.filter(f => f.id !== id));
+  }, []);
+
+  const parseDocuments = useCallback(async () => {
+    if (uploadedDocs.length === 0 && !rawInput.trim()) return;
     setIsParsing(true);
     try {
+      const files = uploadedDocs.map(d => ({
+        data: d.data,
+        name: d.name,
+        type: d.type,
+      }));
+
       const { data, error } = await supabase.functions.invoke('parse-itinerary', {
-        body: { text: rawInput },
+        body: {
+          text: rawInput.trim() || undefined,
+          files: files.length > 0 ? files : undefined,
+        },
       });
       if (error) throw error;
       const events: Partial<ItineraryEvent>[] = (data.events || []).map((ev: any) => ({
@@ -61,20 +80,25 @@ export default function Phase2Itinerary() {
       }));
       if (events.length === 0) {
         toast.info('No events could be extracted. Try adding more detail.');
-        const fallback = parseRawInput(rawInput);
-        setPreviewEvents(fallback);
+        if (rawInput.trim()) {
+          const fallback = parseRawInput(rawInput);
+          setPreviewEvents(fallback);
+        }
       } else {
         setPreviewEvents(events);
+        toast.success(`Extracted ${events.length} event(s) from your documents.`);
       }
     } catch (err) {
       console.error('AI parse failed, falling back to regex:', err);
       toast.error('AI parsing unavailable, using local parser.');
-      const fallback = parseRawInput(rawInput);
-      setPreviewEvents(fallback);
+      if (rawInput.trim()) {
+        const fallback = parseRawInput(rawInput);
+        setPreviewEvents(fallback);
+      }
     } finally {
       setIsParsing(false);
     }
-  }, [rawInput, projectId]);
+  }, [uploadedDocs, rawInput]);
 
   if (!project) { navigate('/'); return null; }
 
@@ -102,7 +126,7 @@ export default function Phase2Itinerary() {
     `${a.displayDate}${a.displayTime || ''}`.localeCompare(`${b.displayDate}${b.displayTime || ''}`)
   );
 
-  const parseAndAdd = parseAndAddCb;
+  const parseAndAdd = parseDocuments;
 
   const confirmPreview = () => {
     const eventsToAdd = previewEvents.map(ev => ({
@@ -129,6 +153,7 @@ export default function Phase2Itinerary() {
       },
     }));
     setPreviewEvents([]);
+    setUploadedDocs([]);
     setRawInput('');
     toast.success(`${eventsToAdd.length} event(s) added to itinerary.`);
   };
@@ -243,29 +268,72 @@ export default function Phase2Itinerary() {
         </div>
       </div>
 
-      {/* Raw Input */}
-      <Card className="mb-8">
+      {/* Step 1: Upload Documents */}
+      <Card className="mb-6">
+        <CardContent className="p-4 space-y-3">
+          <div className="flex items-center gap-2 text-sm font-medium">
+            <Upload className="h-4 w-4 text-muted-foreground" />
+            Step 1: Upload booking documents
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Upload PDFs, screenshots, or images of your booking confirmations. AI will extract all events automatically.
+          </p>
+          <FileDropZone onFilesAdded={handleDocsAdded} />
+          {uploadedDocs.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex flex-wrap gap-2">
+                {uploadedDocs.map(doc => {
+                  const Icon = doc.type.startsWith('image/') ? Image : doc.type.includes('pdf') ? FileText : File;
+                  return (
+                    <div key={doc.id} className="flex items-center gap-1.5 bg-secondary rounded-md px-2 py-1 text-xs group">
+                      <Icon className="h-3 w-3 text-muted-foreground shrink-0" />
+                      <span className="truncate max-w-[150px]">{doc.name}</span>
+                      <button
+                        onClick={() => removeDoc(doc.id)}
+                        className="ml-0.5 text-destructive hover:text-destructive"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Optional: Paste text */}
+      <Card className="mb-6">
         <CardContent className="p-4 space-y-3">
           <div className="flex items-center gap-2 text-sm font-medium">
             <FileText className="h-4 w-4 text-muted-foreground" />
-            Paste reservation details
+            Or paste reservation details
           </div>
           <Textarea
             value={rawInput}
             onChange={e => setRawInput(e.target.value)}
             placeholder="Paste your booking confirmations, flight details, hotel reservations here..."
-            rows={4}
+            rows={3}
             disabled={isParsing}
           />
-          <Button size="sm" onClick={parseAndAdd} variant="secondary" disabled={isParsing || !rawInput.trim()}>
-            {isParsing ? (
-              <><Loader2 className="h-3 w-3 animate-spin mr-1" /> Analyzing...</>
-            ) : (
-              <><Sparkles className="h-3 w-3 mr-1" /> Parse with AI</>
-            )}
-          </Button>
         </CardContent>
       </Card>
+
+      {/* Parse button */}
+      <div className="mb-8">
+        <Button
+          onClick={parseDocuments}
+          disabled={isParsing || (uploadedDocs.length === 0 && !rawInput.trim())}
+          className="w-full gap-2"
+        >
+          {isParsing ? (
+            <><Loader2 className="h-4 w-4 animate-spin" /> Analyzing documents...</>
+          ) : (
+            <><Sparkles className="h-4 w-4" /> Parse {uploadedDocs.length > 0 ? `${uploadedDocs.length} document(s)` : 'text'} with AI</>
+          )}
+        </Button>
+      </div>
 
       {/* Preview Step */}
       {previewEvents.length > 0 && (

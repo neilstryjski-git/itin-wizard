@@ -287,8 +287,14 @@ export default function ExportPreview() {
                       </td>
                       {/* Merged notes/documents cell — only render on first row with rowSpan */}
                       {ri === 0 && (
-                        <td className="p-2 align-top text-xs text-muted-foreground whitespace-pre-line" rowSpan={table.rows.length}>
-                          {table.notes}
+                        <td className="p-2 align-top text-xs text-muted-foreground" rowSpan={table.rows.length}>
+                          {table.noteItems.length > 0 && !isEditing && (
+                            <ul className="list-disc list-inside space-y-1 mb-1">
+                              {table.noteItems.map((item, ni) => (
+                                <li key={ni}>{item}</li>
+                              ))}
+                            </ul>
+                          )}
                           {/* Links editing */}
                           {isEditing && (
                             <div className="mt-1 space-y-1">

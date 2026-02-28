@@ -11,7 +11,7 @@ import { useProjectsContext } from '@/contexts/ProjectsContext';
 import { ItineraryEvent, TravelLink } from '@/types/project';
 import {
   EVENT_EMOJI, EVENT_TYPE_LABELS, formatDate, formatTime,
-  buildEventTable, getEventTitle, buildTimeline, googleMapsUrl,
+  buildEventTable, getEventTitle, getEventTitlePdf, stripEmoji, buildTimeline, googleMapsUrl,
 } from '@/lib/itinerary-utils';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -108,15 +108,16 @@ export default function ExportPreview() {
 
       doc.setFontSize(12);
       doc.setFont('helvetica', 'bold');
-      doc.text(getEventTitle(event), margin, y);
+      doc.text(getEventTitlePdf(event), margin, y);
       y += 2;
 
       const table = buildEventTable(event);
+      const pdfNotes = stripEmoji(table.notes);
       const bodyRows = table.rows.map((r, i) => {
-        if (i === 0 && table.notes) {
-          return [r.field, r.details, { content: table.notes, rowSpan: table.rows.length }];
+        if (i === 0 && pdfNotes) {
+          return [r.field, r.details, { content: pdfNotes, rowSpan: table.rows.length }];
         }
-        if (i > 0 && table.notes) {
+        if (i > 0 && pdfNotes) {
           return [r.field, r.details]; // notes cell is spanned from first row
         }
         return [r.field, r.details, ''];
@@ -139,12 +140,12 @@ export default function ExportPreview() {
       if (y > 240) { doc.addPage(); y = 15; }
       doc.setFontSize(12);
       doc.setFont('helvetica', 'bold');
-      doc.text('📋 Requirements Checklist', margin, y);
+      doc.text('Requirements Checklist', margin, y);
       y += 2;
       autoTable(doc, {
         startY: y,
         head: [['', 'Item', 'Notes']],
-        body: project.phase_1_requirements.checklist.map(item => [item.checked ? '✓' : '☐', item.title, item.description || '']),
+        body: project.phase_1_requirements.checklist.map(item => [item.checked ? 'Y' : '-', item.title, item.description || '']),
         margin: { left: margin, right: margin },
         theme: 'grid',
         headStyles: { fillColor: [60, 60, 60], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
@@ -159,12 +160,12 @@ export default function ExportPreview() {
       if (y > 240) { doc.addPage(); y = 15; }
       doc.setFontSize(12);
       doc.setFont('helvetica', 'bold');
-      doc.text('🧳 Packing List', margin, y);
+      doc.text('Packing List', margin, y);
       y += 2;
       const cats = [...new Set(project.phase_3_packing.items.map(i => i.category))].sort();
       const packRows = cats.flatMap(cat => [
         [{ content: cat, colSpan: 3, styles: { fontStyle: 'bold' as const, fillColor: [240, 240, 240] as [number, number, number] } }],
-        ...project.phase_3_packing.items.filter(i => i.category === cat).map(item => [item.checked ? '✓' : '☐', item.name, item.assignedTo || '']),
+        ...project.phase_3_packing.items.filter(i => i.category === cat).map(item => [item.checked ? 'Y' : '-', item.name, item.assignedTo || '']),
       ]);
       autoTable(doc, {
         startY: y,

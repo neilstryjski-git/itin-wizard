@@ -135,6 +135,26 @@ export function getEventTitle(event: ItineraryEvent): string {
   return `${emoji} ${event.title}`;
 }
 
+/** PDF-safe event title (no emoji — jsPDF can't render them) */
+const PDF_TYPE_PREFIX: Record<string, string> = {
+  'flight': '[Flight]',
+  'check-in': '[Check-In]',
+  'check-out': '[Check-Out]',
+  'accommodation': '[Accommodation]',
+  'activity': '[Activity]',
+  'transfer': '[Transfer]',
+};
+
+export function getEventTitlePdf(event: ItineraryEvent): string {
+  const prefix = PDF_TYPE_PREFIX[event.type] || '';
+  return `${prefix} ${event.title}`;
+}
+
+/** Strip emoji from a string for PDF-safe output */
+export function stripEmoji(text: string): string {
+  return text.replace(/[\u{1F000}-\u{1FFFF}]|[\u{2600}-\u{27BF}]|[\u{FE00}-\u{FE0F}]|[\u{1F900}-\u{1F9FF}]|[\u{200D}]|[\u{20E3}]|[\u{E0020}-\u{E007F}]|[✈🏡📍🚗🔗📎📝📋🧳✓☐]/gu, '').trim();
+}
+
 /**
  * Returns the effective sort key for an event.
  * For flights, uses departureTime; for others, uses time.

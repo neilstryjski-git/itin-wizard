@@ -192,13 +192,11 @@ export function buildTimeline(events: ItineraryEvent[]): TimelineEntry[] {
         });
       }
     } else if (ev.type === 'check-in') {
-      // Legacy type — treat as accommodation check-in bookend (don't duplicate)
       entries.push({
         event: ev, displayType: 'check-in', displayDate: ev.date,
         displayTime: ev.time || '15:00', isBookend: 'check-in',
       });
     } else if (ev.type === 'check-out') {
-      // Legacy type — treat as accommodation check-out bookend (don't duplicate)
       entries.push({
         event: ev, displayType: 'check-out', displayDate: ev.date,
         displayTime: ev.time || '11:00', isBookend: 'check-out',
@@ -209,8 +207,25 @@ export function buildTimeline(events: ItineraryEvent[]): TimelineEntry[] {
       entries.push({ event: ev, displayType: ev.type, displayDate: ev.date, displayTime: ev.time });
     }
   }
-  entries.sort((a, b) =>
-    `${a.displayDate}${a.displayTime || ''}`.localeCompare(`${b.displayDate}${b.displayTime || ''}`)
-  );
+
+  // Sort chronologically by date then time.
+  // Events missing a time get a sensible default so they don't cluster at midnight.
+  const defaultTime = (e: TimelineEntry): string => {
+    if (e.displayTime) return e.displayTime;
+    // No time specified — place in the middle of the day so it falls between
+    // morning check-outs/flights and afternoon check-ins.
+    return '12:00';
+  };
+
+  entries.sort((a, b) => {
+    const keyA = `${a.displayDate}T${defaultTime(a)}`;
+    const keyB = `${b.displayDate}T${defaultTime(b)}`;
+    if (keyA !== keyB) return keyA.localeCompare(keyB);
+    // Tie-break: check-in before other events, check-out after
+    const priority = (e: TimelineEntry) =>
+      e.isBookend === 'check-in' ? 0 : e.isBookend === 'check-out' ? 2 : 1;
+    return priority(a) - priority(b);
+  });
+
   return entries;
 }

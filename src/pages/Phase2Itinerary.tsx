@@ -15,6 +15,7 @@ import { useProjectsContext } from '@/contexts/ProjectsContext';
 import { ItineraryEvent, TravelLink, FileAttachment } from '@/types/project';
 import { FileDropZone, AttachmentList } from '@/components/FileDropZone';
 import { supabase } from '@/integrations/supabase/client';
+import { buildTimeline } from '@/lib/itinerary-utils';
 
 const EVENT_ICONS: Record<string, any> = {
   'flight': Plane,
@@ -100,31 +101,7 @@ export default function Phase2Itinerary() {
 
   if (!project) { navigate('/'); return null; }
 
-  // Expand accommodation events into check-in / check-out bookends for display
-  type TimelineEntry = { event: ItineraryEvent; displayType: string; displayDate: string; displayTime?: string; isBookend?: 'check-in' | 'check-out' };
-
-  const timelineEntries: TimelineEntry[] = [];
-  for (const ev of project.phase_2_itinerary.events) {
-    if (ev.type === 'accommodation') {
-      timelineEntries.push({
-        event: ev, displayType: 'check-in', displayDate: ev.date,
-        displayTime: ev.time || '15:00', isBookend: 'check-in',
-      });
-      if (ev.endDate && ev.endDate !== ev.date) {
-        timelineEntries.push({
-          event: ev, displayType: 'check-out', displayDate: ev.endDate,
-          displayTime: '11:00', isBookend: 'check-out',
-        });
-      }
-    } else if (ev.type === 'flight') {
-      timelineEntries.push({ event: ev, displayType: 'flight', displayDate: ev.date, displayTime: ev.departureTime });
-    } else {
-      timelineEntries.push({ event: ev, displayType: ev.type, displayDate: ev.date, displayTime: ev.time });
-    }
-  }
-  timelineEntries.sort((a, b) =>
-    `${a.displayDate}${a.displayTime || ''}`.localeCompare(`${b.displayDate}${b.displayTime || ''}`)
-  );
+  const timelineEntries = buildTimeline(project.phase_2_itinerary.events);
 
   const parseAndAdd = parseDocuments;
 

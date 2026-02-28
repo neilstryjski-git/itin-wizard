@@ -9,6 +9,12 @@ export function normalizeDate(value: string | undefined | null): string {
   if (!value || !value.trim()) return '';
   const trimmed = value.trim();
 
+  // ISO datetime strings like "2026-03-15T00:00:00.000Z" — extract date part
+  const isoDateTimeMatch = trimmed.match(/^(\d{4})-(\d{1,2})-(\d{1,2})T/);
+  if (isoDateTimeMatch) {
+    return `${isoDateTimeMatch[1]}-${isoDateTimeMatch[2].padStart(2, '0')}-${isoDateTimeMatch[3].padStart(2, '0')}`;
+  }
+
   // Already YYYY-MM-DD (possibly with single-digit month/day like 2026-3-1)
   const isoMatch = trimmed.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
   if (isoMatch) {
@@ -25,6 +31,8 @@ export function normalizeDate(value: string | undefined | null): string {
     'yyyy/MM/dd',
     'dd-MM-yyyy',
     'MM-dd-yyyy',
+    'MMMM d, yyyy',
+    'MMM d, yyyy',
   ];
   for (const fmt of formats) {
     const parsed = parse(trimmed, fmt, new Date());
@@ -34,9 +42,13 @@ export function normalizeDate(value: string | undefined | null): string {
   }
 
   // Fallback: native Date parsing (handles "March 15, 2026" etc.)
+  // Use local date components to avoid UTC→local timezone shift
   const d = new Date(trimmed);
   if (!isNaN(d.getTime()) && d.getFullYear() > 1000) {
-    return format(d, 'yyyy-MM-dd');
+    const y = d.getFullYear();
+    const m = (d.getMonth() + 1).toString().padStart(2, '0');
+    const day = d.getDate().toString().padStart(2, '0');
+    return `${y}-${m}-${day}`;
   }
 
   return trimmed; // Can't parse, return as-is
@@ -248,16 +260,19 @@ export function buildTimeline(events: ItineraryEvent[]): TimelineEntry[] {
     }
   }
 
-  // Sort chronologically by normalized date then time.
-  const defaultTime = (e: TimelineEntry): string => {
-    if (e.displayTime) return e.displayTime;
-    return '12:00';
+  // Sort chronologically using numeric Date comparison (not string)
+  const parseToTimestamp = (dateStr: string, timeStr?: string): number => {
+    const parts = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!parts) return 0; // unparseable dates sort to top
+    const hours = timeStr ? parseInt(timeStr.split(':')[0] || '12', 10) : 12;
+    const mins = timeStr ? parseInt(timeStr.split(':')[1] || '0', 10) : 0;
+    return new Date(Number(parts[1]), Number(parts[2]) - 1, Number(parts[3]), hours, mins).getTime();
   };
 
   entries.sort((a, b) => {
-    const keyA = `${a.displayDate}T${defaultTime(a)}`;
-    const keyB = `${b.displayDate}T${defaultTime(b)}`;
-    if (keyA !== keyB) return keyA.localeCompare(keyB);
+    const tsA = parseToTimestamp(a.displayDate, a.displayTime);
+    const tsB = parseToTimestamp(b.displayDate, b.displayTime);
+    if (tsA !== tsB) return tsA - tsB;
     // Tie-break: check-in before other events, check-out after
     const priority = (e: TimelineEntry) =>
       e.isBookend === 'check-in' ? 0 : e.isBookend === 'check-out' ? 2 : 1;

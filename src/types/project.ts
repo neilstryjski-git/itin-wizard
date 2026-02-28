@@ -3,6 +3,15 @@ export interface TravelLink {
   url: string;
 }
 
+export interface FileAttachment {
+  id: string;
+  name: string;
+  type: string;
+  size: number;
+  data: string; // base64 data URI
+  addedAt: string;
+}
+
 export interface RequirementItem {
   id: string;
   title: string;
@@ -18,8 +27,8 @@ export interface ItineraryEvent {
   id: string;
   type: 'flight-departure' | 'flight-arrival' | 'check-in' | 'check-out' | 'activity' | 'transfer';
   title: string;
-  date: string; // ISO date
-  time?: string; // HH:mm
+  date: string;
+  time?: string;
   location?: string;
   notes?: string;
   links: TravelLink[];
@@ -27,6 +36,7 @@ export interface ItineraryEvent {
   flightNumber?: string;
   address?: string;
   missingFields?: string[];
+  attachments?: FileAttachment[];
 }
 
 export interface PackingItem {

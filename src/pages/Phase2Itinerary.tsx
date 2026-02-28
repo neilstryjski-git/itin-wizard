@@ -17,8 +17,7 @@ import { FileDropZone, AttachmentList } from '@/components/FileDropZone';
 import { supabase } from '@/integrations/supabase/client';
 
 const EVENT_ICONS: Record<string, any> = {
-  'flight-departure': Plane,
-  'flight-arrival': Plane,
+  'flight': Plane,
   'check-in': Hotel,
   'check-out': Hotel,
   'accommodation': Hotel,
@@ -27,8 +26,7 @@ const EVENT_ICONS: Record<string, any> = {
 };
 
 const EVENT_LABELS: Record<string, string> = {
-  'flight-departure': 'Flight Departure',
-  'flight-arrival': 'Flight Arrival',
+  'flight': 'Flight',
   'check-in': 'Check-In',
   'check-out': 'Check-Out',
   'accommodation': 'Accommodation',
@@ -118,6 +116,8 @@ export default function Phase2Itinerary() {
           displayTime: '11:00', isBookend: 'check-out',
         });
       }
+    } else if (ev.type === 'flight') {
+      timelineEntries.push({ event: ev, displayType: 'flight', displayDate: ev.date, displayTime: ev.departureTime });
     } else {
       timelineEntries.push({ event: ev, displayType: ev.type, displayDate: ev.date, displayTime: ev.time });
     }
@@ -380,17 +380,29 @@ export default function Phase2Itinerary() {
                           <Trash2 className="h-3 w-3" />
                         </Button>
                       </div>
-                      <div className={`grid gap-2 ${ev.type === 'accommodation' ? 'grid-cols-4' : 'grid-cols-3'}`}>
+                      <div className={`grid gap-2 ${ev.type === 'accommodation' ? 'grid-cols-4' : ev.type === 'flight' ? 'grid-cols-2' : 'grid-cols-3'}`}>
                         <Input type="date" className="h-7 text-xs" value={ev.date || ''} onChange={e => updatePreviewEvent(i, { date: e.target.value })} />
                         {ev.type === 'accommodation' && (
                           <Input type="date" className="h-7 text-xs" value={ev.endDate || ''} onChange={e => updatePreviewEvent(i, { endDate: e.target.value })} placeholder="Check-out" />
                         )}
-                        <Input type="time" className="h-7 text-xs" value={ev.time || ''} onChange={e => updatePreviewEvent(i, { time: e.target.value })} />
-                        <Input className="h-7 text-xs" placeholder="Location" value={ev.location || ''} onChange={e => updatePreviewEvent(i, { location: e.target.value })} />
+                        {ev.type !== 'flight' && (
+                          <>
+                            <Input type="time" className="h-7 text-xs" value={ev.time || ''} onChange={e => updatePreviewEvent(i, { time: e.target.value })} />
+                            <Input className="h-7 text-xs" placeholder="Location" value={ev.location || ''} onChange={e => updatePreviewEvent(i, { location: e.target.value })} />
+                          </>
+                        )}
                       </div>
+                      {ev.type === 'flight' && (
+                        <div className="grid grid-cols-4 gap-2">
+                          <Input className="h-7 text-xs" placeholder="Departure city" value={ev.departureLocation || ''} onChange={e => updatePreviewEvent(i, { departureLocation: e.target.value })} />
+                          <Input type="time" className="h-7 text-xs" value={ev.departureTime || ''} onChange={e => updatePreviewEvent(i, { departureTime: e.target.value })} />
+                          <Input className="h-7 text-xs" placeholder="Arrival city" value={ev.arrivalLocation || ''} onChange={e => updatePreviewEvent(i, { arrivalLocation: e.target.value })} />
+                          <Input type="time" className="h-7 text-xs" value={ev.arrivalTime || ''} onChange={e => updatePreviewEvent(i, { arrivalTime: e.target.value })} />
+                        </div>
+                      )}
                       <div className="grid grid-cols-2 gap-2">
                         <Input className="h-7 text-xs" placeholder="Confirmation code" value={ev.confirmationCode || ''} onChange={e => updatePreviewEvent(i, { confirmationCode: e.target.value })} />
-                        {(ev.type === 'flight-departure' || ev.type === 'flight-arrival') && (
+                        {ev.type === 'flight' && (
                           <Input className="h-7 text-xs" placeholder="Flight #" value={ev.flightNumber || ''} onChange={e => updatePreviewEvent(i, { flightNumber: e.target.value })} />
                         )}
                       </div>
@@ -433,7 +445,7 @@ export default function Phase2Itinerary() {
                   ) : (
                     <div className="flex gap-3">
                       <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${
-                        displayType.includes('flight') ? 'bg-primary/10 text-primary' :
+                        displayType === 'flight' ? 'bg-primary/10 text-primary' :
                         displayType.includes('check') || displayType === 'accommodation' ? 'bg-accent text-accent-foreground' :
                         'bg-secondary text-secondary-foreground'
                       }`}>
@@ -453,13 +465,31 @@ export default function Phase2Itinerary() {
                         </div>
                         {!isBookend && <h4 className="font-semibold">{event.title}</h4>}
                         <div className="flex flex-wrap gap-3 mt-1 text-sm text-muted-foreground">
-                          <span className="flex items-center gap-1">
-                            <Clock className="h-3 w-3" /> {displayDate}{displayTime ? ` · ${displayTime}` : ''}
-                          </span>
-                          {event.location && (
-                            <span className="flex items-center gap-1">
-                              <MapPin className="h-3 w-3" /> {event.location}
-                            </span>
+                          {event.type === 'flight' ? (
+                            <>
+                              <span className="flex items-center gap-1">
+                                <Clock className="h-3 w-3" /> {displayDate}
+                              </span>
+                              {event.departureLocation && (
+                                <span className="flex items-center gap-1">
+                                  <MapPin className="h-3 w-3" /> {event.departureLocation} → {event.arrivalLocation || '?'}
+                                </span>
+                              )}
+                              {event.departureTime && (
+                                <span className="text-xs">{event.departureTime} – {event.arrivalTime || '?'}</span>
+                              )}
+                            </>
+                          ) : (
+                            <>
+                              <span className="flex items-center gap-1">
+                                <Clock className="h-3 w-3" /> {displayDate}{displayTime ? ` · ${displayTime}` : ''}
+                              </span>
+                              {event.location && (
+                                <span className="flex items-center gap-1">
+                                  <MapPin className="h-3 w-3" /> {event.location}
+                                </span>
+                              )}
+                            </>
                           )}
                         </div>
                         {(event.flightNumber || event.confirmationCode) && (
@@ -562,26 +592,59 @@ function EditForm({
           <Input value={form.title || ''} onChange={e => setForm({ ...form, title: e.target.value })} />
         </div>
       </div>
-      <div className={`grid gap-3 ${form.type === 'accommodation' ? 'grid-cols-4' : 'grid-cols-3'}`}>
-        <div>
-          <label className="text-xs font-medium text-muted-foreground">{form.type === 'accommodation' ? 'Check-in Date' : 'Date'}</label>
-          <Input type="date" value={form.date || ''} onChange={e => setForm({ ...form, date: e.target.value })} />
-        </div>
-        {form.type === 'accommodation' && (
-          <div>
-            <label className="text-xs font-medium text-muted-foreground">Check-out Date</label>
-            <Input type="date" value={form.endDate || ''} onChange={e => setForm({ ...form, endDate: e.target.value })} />
+      {form.type === 'flight' ? (
+        <>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">Date</label>
+              <Input type="date" value={form.date || ''} onChange={e => setForm({ ...form, date: e.target.value })} />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">Flight #</label>
+              <Input value={form.flightNumber || ''} onChange={e => setForm({ ...form, flightNumber: e.target.value })} />
+            </div>
           </div>
-        )}
-        <div>
-          <label className="text-xs font-medium text-muted-foreground">Time</label>
-          <Input type="time" value={form.time || ''} onChange={e => setForm({ ...form, time: e.target.value })} />
+          <div className="grid grid-cols-4 gap-3">
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">Departure City</label>
+              <Input value={form.departureLocation || ''} onChange={e => setForm({ ...form, departureLocation: e.target.value })} />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">Departure Time</label>
+              <Input type="time" value={form.departureTime || ''} onChange={e => setForm({ ...form, departureTime: e.target.value })} />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">Arrival City</label>
+              <Input value={form.arrivalLocation || ''} onChange={e => setForm({ ...form, arrivalLocation: e.target.value })} />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">Arrival Time</label>
+              <Input type="time" value={form.arrivalTime || ''} onChange={e => setForm({ ...form, arrivalTime: e.target.value })} />
+            </div>
+          </div>
+        </>
+      ) : (
+        <div className={`grid gap-3 ${form.type === 'accommodation' ? 'grid-cols-4' : 'grid-cols-3'}`}>
+          <div>
+            <label className="text-xs font-medium text-muted-foreground">{form.type === 'accommodation' ? 'Check-in Date' : 'Date'}</label>
+            <Input type="date" value={form.date || ''} onChange={e => setForm({ ...form, date: e.target.value })} />
+          </div>
+          {form.type === 'accommodation' && (
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">Check-out Date</label>
+              <Input type="date" value={form.endDate || ''} onChange={e => setForm({ ...form, endDate: e.target.value })} />
+            </div>
+          )}
+          <div>
+            <label className="text-xs font-medium text-muted-foreground">Time</label>
+            <Input type="time" value={form.time || ''} onChange={e => setForm({ ...form, time: e.target.value })} />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-muted-foreground">Location</label>
+            <Input value={form.location || ''} onChange={e => setForm({ ...form, location: e.target.value })} />
+          </div>
         </div>
-        <div>
-          <label className="text-xs font-medium text-muted-foreground">Location</label>
-          <Input value={form.location || ''} onChange={e => setForm({ ...form, location: e.target.value })} />
-        </div>
-      </div>
+      )}
       <div>
         <label className="text-xs font-medium text-muted-foreground">Confirmation Code</label>
         <Input value={form.confirmationCode || ''} onChange={e => setForm({ ...form, confirmationCode: e.target.value })} />
@@ -652,20 +715,11 @@ function parseRawInput(text: string): ItineraryEvent[] {
     const title = extractTitle(fullText);
 
     // Determine event type
-    if (/flight|fly/i.test(lower) && /depart/i.test(lower) && /arriv/i.test(lower)) {
+    if (/flight|fly|airline|air\s|depart.*flight/i.test(lower)) {
       events.push({
-        id: crypto.randomUUID(), type: 'flight-departure', title: title || 'Flight Departure',
-        date, time, location, flightNumber, confirmationCode: confirmation, links,
-      });
-      events.push({
-        id: crypto.randomUUID(), type: 'flight-arrival', title: title || 'Flight Arrival',
-        date, links: [],
-      });
-    } else if (/flight|airline|air\s|depart.*flight|fly/i.test(lower)) {
-      const type = /arriv|land/i.test(lower) ? 'flight-arrival' : 'flight-departure';
-      events.push({
-        id: crypto.randomUUID(), type, title: title || (type === 'flight-departure' ? 'Flight Departure' : 'Flight Arrival'),
-        date, time, location, flightNumber, confirmationCode: confirmation, links,
+        id: crypto.randomUUID(), type: 'flight', title: title || 'Flight',
+        date, departureLocation: location, departureTime: time,
+        flightNumber, confirmationCode: confirmation, links,
       });
     } else if (/check.?in/i.test(lower)) {
       events.push({

@@ -26,6 +26,7 @@ export default function ExportPreview() {
   const [editingEvent, setEditingEvent] = useState<string | null>(null);
   const [linkForm, setLinkForm] = useState<{ eventId: string; label: string; url: string; mode: 'link' | 'note' } | null>(null);
   const [notesEdit, setNotesEdit] = useState<{ eventId: string; field: string; value: string } | null>(null);
+  const [fieldLinkEdit, setFieldLinkEdit] = useState<{ eventId: string; field: string; url: string } | null>(null);
 
   if (!project) { navigate('/'); return null; }
 
@@ -253,37 +254,119 @@ export default function ExportPreview() {
                     <tr key={ri} className="border-b border-border last:border-b-0">
                       <td className="p-2 font-semibold text-muted-foreground align-top">{row.field}</td>
                       <td className="p-2 align-top">
-                        {isEditing && notesEdit?.eventId === event.id && notesEdit.field === row.field.toLowerCase() ? (
-                          <div className="flex gap-1">
-                            <Input
-                              className="h-7 text-xs"
-                              value={notesEdit.value}
-                              onChange={e => setNotesEdit({ ...notesEdit, value: e.target.value })}
-                              onKeyDown={e => e.key === 'Enter' && saveNotesEdit()}
-                            />
-                            <Button size="sm" variant="ghost" className="h-7 px-2" onClick={saveNotesEdit}>
-                              <Check className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        ) : (
-                          <span
-                            className={isEditing ? 'cursor-pointer hover:bg-muted/50 px-1 rounded' : ''}
-                            onClick={() => {
-                              if (!isEditing) return;
-                              const fieldMap: Record<string, string> = {
-                                'Location': 'location',
-                                'Details': 'notes',
-                                'Confirmation': 'confirmationCode',
-                              };
-                              const mapped = fieldMap[row.field];
-                              if (mapped) {
-                                setNotesEdit({ eventId: event.id, field: mapped, value: (event as any)[mapped] || '' });
-                              }
-                            }}
-                          >
-                            {row.details}
-                          </span>
-                        )}
+                        {(() => {
+                          const fieldMap: Record<string, string> = {
+                            'Location': 'location',
+                            'Details': 'notes',
+                            'Confirmation': 'confirmationCode',
+                            'Departure': 'departureLocation',
+                            'Arrival': 'arrivalLocation',
+                          };
+                          const fieldKey = fieldMap[row.field];
+                          const fieldUrl = fieldKey && event.fieldUrls?.[fieldKey];
+
+                          // Editing the text value
+                          if (isEditing && notesEdit?.eventId === event.id && notesEdit.field === fieldKey) {
+                            return (
+                              <div className="flex gap-1">
+                                <Input
+                                  className="h-7 text-xs"
+                                  value={notesEdit.value}
+                                  onChange={e => setNotesEdit({ ...notesEdit, value: e.target.value })}
+                                  onKeyDown={e => e.key === 'Enter' && saveNotesEdit()}
+                                />
+                                <Button size="sm" variant="ghost" className="h-7 px-2" onClick={saveNotesEdit}>
+                                  <Check className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            );
+                          }
+
+                          // Adding a URL to a field
+                          if (isEditing && fieldLinkEdit?.eventId === event.id && fieldLinkEdit.field === fieldKey) {
+                            return (
+                              <div className="space-y-1">
+                                <span className="text-xs">{row.details}</span>
+                                <div className="flex gap-1">
+                                  <Input
+                                    className="h-6 text-xs"
+                                    placeholder="https://..."
+                                    value={fieldLinkEdit.url}
+                                    onChange={e => setFieldLinkEdit({ ...fieldLinkEdit, url: e.target.value })}
+                                    onKeyDown={e => {
+                                      if (e.key === 'Enter' && fieldLinkEdit.url) {
+                                        updateEvent(event.id, { fieldUrls: { ...(event.fieldUrls || {}), [fieldKey]: fieldLinkEdit.url } });
+                                        setFieldLinkEdit(null);
+                                      }
+                                    }}
+                                    autoFocus
+                                  />
+                                  <Button size="sm" variant="ghost" className="h-6 px-2" onClick={() => {
+                                    if (fieldLinkEdit.url) {
+                                      updateEvent(event.id, { fieldUrls: { ...(event.fieldUrls || {}), [fieldKey]: fieldLinkEdit.url } });
+                                      setFieldLinkEdit(null);
+                                    }
+                                  }}>
+                                    <Check className="h-3 w-3" />
+                                  </Button>
+                                  <Button size="sm" variant="ghost" className="h-6 px-2" onClick={() => setFieldLinkEdit(null)}>
+                                    <X className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              </div>
+                            );
+                          }
+
+                          // Display mode
+                          const detailContent = fieldUrl ? (
+                            <a href={fieldUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline inline-flex items-center gap-0.5">
+                              {row.details} <ExternalLink className="h-2.5 w-2.5 shrink-0" />
+                            </a>
+                          ) : (
+                            <span>{row.details}</span>
+                          );
+
+                          if (!isEditing || !fieldKey) return detailContent;
+
+                          // Edit mode: show value + action buttons
+                          return (
+                            <div className="group">
+                              {detailContent}
+                              <div className="flex gap-1 mt-1 opacity-70 group-hover:opacity-100">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-5 text-xs gap-0.5"
+                                  onClick={() => setNotesEdit({ eventId: event.id, field: fieldKey, value: (event as any)[fieldKey] || '' })}
+                                >
+                                  <Pencil className="h-2.5 w-2.5" /> Edit
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-5 text-xs gap-0.5 text-primary"
+                                  onClick={() => setFieldLinkEdit({ eventId: event.id, field: fieldKey, url: fieldUrl || '' })}
+                                >
+                                  <LinkIcon className="h-2.5 w-2.5" /> {fieldUrl ? 'Edit link' : 'Add link'}
+                                </Button>
+                                {fieldUrl && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-5 text-xs gap-0.5 text-destructive"
+                                    onClick={() => {
+                                      const updated = { ...(event.fieldUrls || {}) };
+                                      delete updated[fieldKey];
+                                      updateEvent(event.id, { fieldUrls: updated });
+                                    }}
+                                  >
+                                    <X className="h-2.5 w-2.5" /> Remove link
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })()}
                       </td>
                       {/* Merged notes/documents cell — only render on first row with rowSpan */}
                       {ri === 0 && (

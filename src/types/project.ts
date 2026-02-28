@@ -42,6 +42,7 @@ export interface ItineraryEvent {
   address?: string;
   missingFields?: string[];
   attachments?: FileAttachment[];
+  fieldUrls?: Record<string, string>; // Maps field keys (e.g. 'location', 'confirmationCode') to URLs
 }
 
 export interface PackingItem {

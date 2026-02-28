@@ -16,6 +16,7 @@ import { ItineraryEvent, TravelLink, FileAttachment } from '@/types/project';
 import { FileDropZone, AttachmentList } from '@/components/FileDropZone';
 import { supabase } from '@/integrations/supabase/client';
 import { buildTimeline, normalizeDate } from '@/lib/itinerary-utils';
+import { SortableList, SortableItem, arrayMove } from '@/components/SortableEventList';
 
 const EVENT_ICONS: Record<string, any> = {
   'flight': Plane,
@@ -99,9 +100,19 @@ export default function Phase2Itinerary() {
     }
   }, [uploadedDocs, rawInput]);
 
+  const reorderEvents = useCallback((oldIndex: number, newIndex: number) => {
+    updateProject(projectId!, p => ({
+      ...p,
+      phase_2_itinerary: {
+        ...p.phase_2_itinerary,
+        events: arrayMove([...p.phase_2_itinerary.events], oldIndex, newIndex),
+      },
+    }));
+  }, [projectId, updateProject]);
+
   if (!project) { navigate('/'); return null; }
 
-  const timelineEntries = buildTimeline(project.phase_2_itinerary.events);
+  const timelineEntries = buildTimeline(project.phase_2_itinerary.events, { preserveOrder: true });
 
   const parseAndAdd = parseDocuments;
 
@@ -406,126 +417,141 @@ export default function Phase2Itinerary() {
             No events yet. Paste reservation data above or add events manually.
           </p>
         ) : (
-          timelineEntries.map((entry, i) => {
-            const { event, displayType, displayDate, displayTime, isBookend } = entry;
-            const Icon = EVENT_ICONS[displayType] || MapPin;
-            const isEditing = editingId === event.id;
-            const missing = hasMissing(event);
-            const bookendLabel = isBookend === 'check-in' ? 'Check-In' : isBookend === 'check-out' ? 'Check-Out' : EVENT_LABELS[event.type];
+          <SortableList
+            items={project.phase_2_itinerary.events.map(e => e.id)}
+            onReorder={reorderEvents}
+          >
+            {timelineEntries.map((entry, i) => {
+              const { event, displayType, displayDate, displayTime, isBookend } = entry;
+              const Icon = EVENT_ICONS[displayType] || MapPin;
+              const isEditing = editingId === event.id;
+              const missing = hasMissing(event);
+              const bookendLabel = isBookend === 'check-in' ? 'Check-In' : isBookend === 'check-out' ? 'Check-Out' : EVENT_LABELS[event.type];
+              const isDraggable = !isBookend || isBookend === 'check-in';
 
-            return (
-              <Card key={`${event.id}-${isBookend || ''}`} className="relative slide-up" style={{ animationDelay: `${i * 40}ms` }}>
-                <CardContent className="p-4">
-                  {isEditing && !isBookend ? (
-                    <EditForm
-                      form={editForm}
-                      setForm={setEditForm}
-                      onSave={saveEdit}
-                      onCancel={cancelEdit}
-                    />
-                  ) : (
-                    <div className="flex gap-3">
-                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${
-                        displayType === 'flight' ? 'bg-primary/10 text-primary' :
-                        displayType.includes('check') || displayType === 'accommodation' ? 'bg-accent text-accent-foreground' :
-                        'bg-secondary text-secondary-foreground'
-                      }`}>
-                        <Icon className="h-5 w-5" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                            {bookendLabel}
-                          </span>
-                          {isBookend && (
-                            <span className="text-xs text-muted-foreground/60 italic">({event.title})</span>
-                          )}
-                          {missing && (
-                            <AlertTriangle className="h-3.5 w-3.5 text-warning" />
-                          )}
+              const cardContent = (
+                <Card className="relative slide-up" style={{ animationDelay: `${i * 40}ms` }}>
+                  <CardContent className="p-4">
+                    {isEditing && !isBookend ? (
+                      <EditForm
+                        form={editForm}
+                        setForm={setEditForm}
+                        onSave={saveEdit}
+                        onCancel={cancelEdit}
+                      />
+                    ) : (
+                      <div className="flex gap-3">
+                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${
+                          displayType === 'flight' ? 'bg-primary/10 text-primary' :
+                          displayType.includes('check') || displayType === 'accommodation' ? 'bg-accent text-accent-foreground' :
+                          'bg-secondary text-secondary-foreground'
+                        }`}>
+                          <Icon className="h-5 w-5" />
                         </div>
-                        {!isBookend && <h4 className="font-semibold">{event.title}</h4>}
-                        <div className="flex flex-wrap gap-3 mt-1 text-sm text-muted-foreground">
-                          {event.type === 'flight' ? (
-                            <>
-                              <span className="flex items-center gap-1">
-                                <Clock className="h-3 w-3" /> {displayDate}
-                              </span>
-                              {event.departureLocation && (
-                                <span className="flex items-center gap-1">
-                                  <MapPin className="h-3 w-3" /> {event.departureLocation} → {event.arrivalLocation || '?'}
-                                </span>
-                              )}
-                              {event.departureTime && (
-                                <span className="text-xs">{event.departureTime} – {event.arrivalTime || '?'}</span>
-                              )}
-                            </>
-                          ) : (
-                            <>
-                              <span className="flex items-center gap-1">
-                                <Clock className="h-3 w-3" /> {displayDate}{displayTime ? ` · ${displayTime}` : ''}
-                              </span>
-                              {event.location && (
-                                <span className="flex items-center gap-1">
-                                  <MapPin className="h-3 w-3" /> {event.location}
-                                </span>
-                              )}
-                            </>
-                          )}
-                        </div>
-                        {(event.flightNumber || event.confirmationCode) && (
-                          <p className="text-xs mt-1 text-muted-foreground">
-                            {event.flightNumber && <><span className="font-mono">{event.flightNumber}</span> · </>}
-                            {event.confirmationCode && <>Conf: <span className="font-mono">{event.confirmationCode}</span></>}
-                          </p>
-                        )}
-                        {event.address && (
-                          <p className="text-xs mt-0.5 text-muted-foreground">📍 {event.address}</p>
-                        )}
-                        {event.missingFields && event.missingFields.length > 0 && (
-                          <p className="text-xs mt-1 text-warning flex items-center gap-1">
-                            <AlertTriangle className="h-3 w-3" /> Missing: {event.missingFields.join(', ')}
-                          </p>
-                        )}
-                        {event.links.length > 0 && (
-                          <div className="mt-2 space-y-1">
-                            {event.links.map((link, li) => (
-                              <a
-                                key={li}
-                                href={link.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex items-center gap-1 text-xs text-primary hover:underline"
-                              >
-                                <LinkIcon className="h-3 w-3" /> {link.label}
-                              </a>
-                            ))}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                              {bookendLabel}
+                            </span>
+                            {isBookend && (
+                              <span className="text-xs text-muted-foreground/60 italic">({event.title})</span>
+                            )}
+                            {missing && (
+                              <AlertTriangle className="h-3.5 w-3.5 text-warning" />
+                            )}
                           </div>
-                        )}
-                        {event.notes && <p className="text-xs mt-2 text-muted-foreground italic">{event.notes}</p>}
-                        <AttachmentList
-                          attachments={event.attachments || []}
-                          onRemove={(attId) => removeAttachment(event.id, attId)}
-                        />
+                          {!isBookend && <h4 className="font-semibold">{event.title}</h4>}
+                          <div className="flex flex-wrap gap-3 mt-1 text-sm text-muted-foreground">
+                            {event.type === 'flight' ? (
+                              <>
+                                <span className="flex items-center gap-1">
+                                  <Clock className="h-3 w-3" /> {displayDate}
+                                </span>
+                                {event.departureLocation && (
+                                  <span className="flex items-center gap-1">
+                                    <MapPin className="h-3 w-3" /> {event.departureLocation} → {event.arrivalLocation || '?'}
+                                  </span>
+                                )}
+                                {event.departureTime && (
+                                  <span className="text-xs">{event.departureTime} – {event.arrivalTime || '?'}</span>
+                                )}
+                              </>
+                            ) : (
+                              <>
+                                <span className="flex items-center gap-1">
+                                  <Clock className="h-3 w-3" /> {displayDate}{displayTime ? ` · ${displayTime}` : ''}
+                                </span>
+                                {event.location && (
+                                  <span className="flex items-center gap-1">
+                                    <MapPin className="h-3 w-3" /> {event.location}
+                                  </span>
+                                )}
+                              </>
+                            )}
+                          </div>
+                          {(event.flightNumber || event.confirmationCode) && (
+                            <p className="text-xs mt-1 text-muted-foreground">
+                              {event.flightNumber && <><span className="font-mono">{event.flightNumber}</span> · </>}
+                              {event.confirmationCode && <>Conf: <span className="font-mono">{event.confirmationCode}</span></>}
+                            </p>
+                          )}
+                          {event.address && (
+                            <p className="text-xs mt-0.5 text-muted-foreground">📍 {event.address}</p>
+                          )}
+                          {event.missingFields && event.missingFields.length > 0 && (
+                            <p className="text-xs mt-1 text-warning flex items-center gap-1">
+                              <AlertTriangle className="h-3 w-3" /> Missing: {event.missingFields.join(', ')}
+                            </p>
+                          )}
+                          {event.links.length > 0 && (
+                            <div className="mt-2 space-y-1">
+                              {event.links.map((link, li) => (
+                                <a
+                                  key={li}
+                                  href={link.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex items-center gap-1 text-xs text-primary hover:underline"
+                                >
+                                  <LinkIcon className="h-3 w-3" /> {link.label}
+                                </a>
+                              ))}
+                            </div>
+                          )}
+                          {event.notes && <p className="text-xs mt-2 text-muted-foreground italic">{event.notes}</p>}
+                          <AttachmentList
+                            attachments={event.attachments || []}
+                            onRemove={(attId) => removeAttachment(event.id, attId)}
+                          />
+                        </div>
+                        <div className="flex gap-1 shrink-0">
+                          <FileDropZone
+                            compact
+                            onFilesAdded={(files) => addAttachments(event.id, files)}
+                          />
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => startEdit(event)}>
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => deleteEvent(event.id)}>
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
                       </div>
-                      <div className="flex gap-1 shrink-0">
-                        <FileDropZone
-                          compact
-                          onFilesAdded={(files) => addAttachments(event.id, files)}
-                        />
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => startEdit(event)}>
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => deleteEvent(event.id)}>
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            );
-          })
+                    )}
+                  </CardContent>
+                </Card>
+              );
+
+              if (isDraggable) {
+                return (
+                  <SortableItem key={`${event.id}-${isBookend || ''}`} id={event.id}>
+                    {cardContent}
+                  </SortableItem>
+                );
+              }
+              return <div key={`${event.id}-${isBookend || ''}`} className="ml-5">{cardContent}</div>;
+            })}
+          </SortableList>
         )}
       </div>
     </div>

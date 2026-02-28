@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Download, ArrowLeft, Plus, X, Pencil, Check, Link as LinkIcon,
@@ -16,6 +16,7 @@ import {
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { toast } from 'sonner';
+import { SortableList, SortableItem, arrayMove } from '@/components/SortableEventList';
 
 export default function ExportPreview() {
   const { projectId } = useParams<{ projectId: string }>();
@@ -28,9 +29,19 @@ export default function ExportPreview() {
   const [notesEdit, setNotesEdit] = useState<{ eventId: string; field: string; value: string } | null>(null);
   const [fieldLinkEdit, setFieldLinkEdit] = useState<{ eventId: string; field: string; url: string } | null>(null);
 
+  const reorderEvents = useCallback((oldIndex: number, newIndex: number) => {
+    updateProject(projectId!, p => ({
+      ...p,
+      phase_2_itinerary: {
+        ...p.phase_2_itinerary,
+        events: arrayMove([...p.phase_2_itinerary.events], oldIndex, newIndex),
+      },
+    }));
+  }, [projectId, updateProject]);
+
   if (!project) { navigate('/'); return null; }
 
-  const timeline = buildTimeline(project.phase_2_itinerary.events);
+  const timeline = buildTimeline(project.phase_2_itinerary.events, { preserveOrder: true });
 
   const updateEvent = (eventId: string, updates: Partial<ItineraryEvent>) => {
     updateProject(projectId!, p => ({
@@ -263,232 +274,240 @@ export default function ExportPreview() {
         <hr className="my-4 border-border" />
 
         {/* Events */}
-        {timeline.map((entry, idx) => {
-          const event = entry.event;
-          const table = buildEventTable(event, entry.isBookend);
-          const isEditing = editingEvent === event.id;
+        <SortableList
+          items={project.phase_2_itinerary.events.map(e => e.id)}
+          onReorder={reorderEvents}
+        >
+          {timeline.map((entry, idx) => {
+            const event = entry.event;
+            const table = buildEventTable(event, entry.isBookend);
+            const isEditing = editingEvent === event.id;
+            const isDraggable = !entry.isBookend || entry.isBookend === 'check-in';
 
-          return (
-            <div key={`${event.id}-${entry.isBookend || idx}`} className="mb-6">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="font-bold text-base">{getEventTitle(event)}</h3>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 text-xs gap-1"
-                  onClick={() => setEditingEvent(isEditing ? null : event.id)}
-                >
-                  {isEditing ? <><Check className="h-3 w-3" /> Done</> : <><Pencil className="h-3 w-3" /> Edit</>}
-                </Button>
-              </div>
+            const eventContent = (
+              <div className="mb-6">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="font-bold text-base">{getEventTitle(event)}</h3>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 text-xs gap-1"
+                    onClick={() => setEditingEvent(isEditing ? null : event.id)}
+                  >
+                    {isEditing ? <><Check className="h-3 w-3" /> Done</> : <><Pencil className="h-3 w-3" /> Edit</>}
+                  </Button>
+                </div>
 
-              {/* Table */}
-              <table className="w-full text-sm border border-border">
-                <thead>
-                  <tr className="bg-muted/50">
-                    <th className="text-left p-2 border-b border-border font-semibold w-[100px]">Field</th>
-                    <th className="text-left p-2 border-b border-border font-semibold">Details</th>
-                    <th className="text-left p-2 border-b border-border font-semibold w-[200px]">Notes/Documents</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {table.rows.map((row, ri) => (
-                    <tr key={ri} className="border-b border-border last:border-b-0">
-                      <td className="p-2 font-semibold text-muted-foreground align-top">{row.field}</td>
-                      <td className="p-2 align-top">
-                        {(() => {
-                          const fieldMap: Record<string, string> = {
-                            'Location': 'location',
-                            'Details': 'notes',
-                            'Confirmation': 'confirmationCode',
-                            'Departure': 'departureLocation',
-                            'Arrival': 'arrivalLocation',
-                          };
-                          const fieldKey = fieldMap[row.field];
-                          const fieldUrl = fieldKey && event.fieldUrls?.[fieldKey];
+                {/* Table */}
+                <table className="w-full text-sm border border-border">
+                  <thead>
+                    <tr className="bg-muted/50">
+                      <th className="text-left p-2 border-b border-border font-semibold w-[100px]">Field</th>
+                      <th className="text-left p-2 border-b border-border font-semibold">Details</th>
+                      <th className="text-left p-2 border-b border-border font-semibold w-[200px]">Notes/Documents</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {table.rows.map((row, ri) => (
+                      <tr key={ri} className="border-b border-border last:border-b-0">
+                        <td className="p-2 font-semibold text-muted-foreground align-top">{row.field}</td>
+                        <td className="p-2 align-top">
+                          {(() => {
+                            const fieldMap: Record<string, string> = {
+                              'Location': 'location',
+                              'Details': 'notes',
+                              'Confirmation': 'confirmationCode',
+                              'Departure': 'departureLocation',
+                              'Arrival': 'arrivalLocation',
+                            };
+                            const fieldKey = fieldMap[row.field];
+                            const fieldUrl = fieldKey && event.fieldUrls?.[fieldKey];
 
-                          // Editing the text value
-                          if (isEditing && notesEdit?.eventId === event.id && notesEdit.field === fieldKey) {
-                            return (
-                              <div className="flex gap-1">
-                                <Input
-                                  className="h-7 text-xs"
-                                  value={notesEdit.value}
-                                  onChange={e => setNotesEdit({ ...notesEdit, value: e.target.value })}
-                                  onKeyDown={e => e.key === 'Enter' && saveNotesEdit()}
-                                />
-                                <Button size="sm" variant="ghost" className="h-7 px-2" onClick={saveNotesEdit}>
-                                  <Check className="h-3 w-3" />
-                                </Button>
-                              </div>
-                            );
-                          }
-
-                          // Adding a URL to a field
-                          if (isEditing && fieldLinkEdit?.eventId === event.id && fieldLinkEdit.field === fieldKey) {
-                            return (
-                              <div className="space-y-1">
-                                <span className="text-xs">{row.details}</span>
+                            if (isEditing && notesEdit?.eventId === event.id && notesEdit.field === fieldKey) {
+                              return (
                                 <div className="flex gap-1">
                                   <Input
-                                    className="h-6 text-xs"
-                                    placeholder="https://..."
-                                    value={fieldLinkEdit.url}
-                                    onChange={e => setFieldLinkEdit({ ...fieldLinkEdit, url: e.target.value })}
-                                    onKeyDown={e => {
-                                      if (e.key === 'Enter' && fieldLinkEdit.url) {
+                                    className="h-7 text-xs"
+                                    value={notesEdit.value}
+                                    onChange={e => setNotesEdit({ ...notesEdit, value: e.target.value })}
+                                    onKeyDown={e => e.key === 'Enter' && saveNotesEdit()}
+                                  />
+                                  <Button size="sm" variant="ghost" className="h-7 px-2" onClick={saveNotesEdit}>
+                                    <Check className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              );
+                            }
+
+                            if (isEditing && fieldLinkEdit?.eventId === event.id && fieldLinkEdit.field === fieldKey) {
+                              return (
+                                <div className="space-y-1">
+                                  <span className="text-xs">{row.details}</span>
+                                  <div className="flex gap-1">
+                                    <Input
+                                      className="h-6 text-xs"
+                                      placeholder="https://..."
+                                      value={fieldLinkEdit.url}
+                                      onChange={e => setFieldLinkEdit({ ...fieldLinkEdit, url: e.target.value })}
+                                      onKeyDown={e => {
+                                        if (e.key === 'Enter' && fieldLinkEdit.url) {
+                                          updateEvent(event.id, { fieldUrls: { ...(event.fieldUrls || {}), [fieldKey]: fieldLinkEdit.url } });
+                                          setFieldLinkEdit(null);
+                                        }
+                                      }}
+                                      autoFocus
+                                    />
+                                    <Button size="sm" variant="ghost" className="h-6 px-2" onClick={() => {
+                                      if (fieldLinkEdit.url) {
                                         updateEvent(event.id, { fieldUrls: { ...(event.fieldUrls || {}), [fieldKey]: fieldLinkEdit.url } });
                                         setFieldLinkEdit(null);
                                       }
-                                    }}
-                                    autoFocus
-                                  />
-                                  <Button size="sm" variant="ghost" className="h-6 px-2" onClick={() => {
-                                    if (fieldLinkEdit.url) {
-                                      updateEvent(event.id, { fieldUrls: { ...(event.fieldUrls || {}), [fieldKey]: fieldLinkEdit.url } });
-                                      setFieldLinkEdit(null);
-                                    }
-                                  }}>
-                                    <Check className="h-3 w-3" />
-                                  </Button>
-                                  <Button size="sm" variant="ghost" className="h-6 px-2" onClick={() => setFieldLinkEdit(null)}>
-                                    <X className="h-3 w-3" />
-                                  </Button>
-                                </div>
-                              </div>
-                            );
-                          }
-
-                          // Display mode
-                          const isLocationField = ['Location', 'Departure', 'Arrival'].includes(row.field);
-                          const effectiveUrl = fieldUrl || (isLocationField && row.details ? googleMapsUrl(row.details) : '');
-                          const detailContent = effectiveUrl ? (
-                            <a href={effectiveUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline inline-flex items-center gap-0.5">
-                              {row.details} <ExternalLink className="h-2.5 w-2.5 shrink-0" />
-                            </a>
-                          ) : (
-                            <span>{row.details}</span>
-                          );
-
-                          if (!isEditing || !fieldKey) return detailContent;
-
-                          // Edit mode: show value + action buttons
-                          return (
-                            <div className="group">
-                              {detailContent}
-                              <div className="flex gap-1 mt-1 opacity-70 group-hover:opacity-100">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-5 text-xs gap-0.5"
-                                  onClick={() => setNotesEdit({ eventId: event.id, field: fieldKey, value: (event as any)[fieldKey] || '' })}
-                                >
-                                  <Pencil className="h-2.5 w-2.5" /> Edit
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-5 text-xs gap-0.5 text-primary"
-                                  onClick={() => setFieldLinkEdit({ eventId: event.id, field: fieldKey, url: fieldUrl || '' })}
-                                >
-                                  <LinkIcon className="h-2.5 w-2.5" /> {fieldUrl ? 'Edit link' : 'Add link'}
-                                </Button>
-                                {fieldUrl && (
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-5 text-xs gap-0.5 text-destructive"
-                                    onClick={() => {
-                                      const updated = { ...(event.fieldUrls || {}) };
-                                      delete updated[fieldKey];
-                                      updateEvent(event.id, { fieldUrls: updated });
-                                    }}
-                                  >
-                                    <X className="h-2.5 w-2.5" /> Remove link
-                                  </Button>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })()}
-                      </td>
-                      {/* Merged notes/documents cell — only render on first row with rowSpan */}
-                      {ri === 0 && (
-                        <td className="p-2 align-top text-xs text-muted-foreground" rowSpan={table.rows.length}>
-                          {/* Display mode */}
-                          {!isEditing && event.links.length > 0 && (
-                            <ul className="list-disc list-inside space-y-1">
-                              {event.links.map((link, li) => (
-                                <li key={li}>
-                                  {link.url ? (
-                                    <a href={link.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline inline-flex items-center gap-0.5">
-                                      <ExternalLink className="h-2.5 w-2.5 inline shrink-0" /> {link.label}
-                                    </a>
-                                  ) : (
-                                    <span>{link.label}</span>
-                                  )}
-                                </li>
-                              ))}
-                            </ul>
-                          )}
-                          {/* Edit mode */}
-                          {isEditing && (
-                            <div className="space-y-1">
-                              {event.links.map((link, li) => (
-                                <div key={li} className="flex items-center gap-1">
-                                  {link.url ? (
-                                    <a href={link.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-0.5 truncate">
-                                      <ExternalLink className="h-2.5 w-2.5 shrink-0" /> {link.label}
-                                    </a>
-                                  ) : (
-                                    <span className="truncate">📝 {link.label}</span>
-                                  )}
-                                  <Button variant="ghost" size="sm" className="h-5 w-5 p-0 text-destructive shrink-0" onClick={() => removeLink(event.id, li)}>
-                                    <X className="h-2.5 w-2.5" />
-                                  </Button>
-                                </div>
-                              ))}
-                              {linkForm?.eventId === event.id ? (
-                                <div className="space-y-1 mt-1">
-                                  <Input className="h-6 text-xs" placeholder={linkForm.mode === 'link' ? 'Label' : 'Note text'} value={linkForm.label} onChange={e => setLinkForm({ ...linkForm, label: e.target.value })} />
-                                  {linkForm.mode === 'link' && (
-                                    <Input className="h-6 text-xs" placeholder="https://..." value={linkForm.url} onChange={e => setLinkForm({ ...linkForm, url: e.target.value })} />
-                                  )}
-                                  <div className="flex gap-1">
-                                    <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={() => {
-                                      if (linkForm.label) {
-                                        addLink(event.id, linkForm.mode === 'link' ? { label: linkForm.label, url: linkForm.url } : { label: linkForm.label });
-                                        setLinkForm(null);
-                                      }
                                     }}>
-                                      <Check className="h-3 w-3 mr-0.5" /> Save
+                                      <Check className="h-3 w-3" />
                                     </Button>
-                                    <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={() => setLinkForm(null)}>
-                                      Cancel
+                                    <Button size="sm" variant="ghost" className="h-6 px-2" onClick={() => setFieldLinkEdit(null)}>
+                                      <X className="h-3 w-3" />
                                     </Button>
                                   </div>
                                 </div>
-                              ) : (
-                                <div className="flex gap-1 mt-1">
-                                  <Button variant="ghost" size="sm" className="h-5 text-xs gap-0.5 text-primary" onClick={() => setLinkForm({ eventId: event.id, label: '', url: '', mode: 'link' })}>
-                                    <LinkIcon className="h-2.5 w-2.5" /> Add link
+                              );
+                            }
+
+                            const isLocationField = ['Location', 'Departure', 'Arrival'].includes(row.field);
+                            const effectiveUrl = fieldUrl || (isLocationField && row.details ? googleMapsUrl(row.details) : '');
+                            const detailContent = effectiveUrl ? (
+                              <a href={effectiveUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline inline-flex items-center gap-0.5">
+                                {row.details} <ExternalLink className="h-2.5 w-2.5 shrink-0" />
+                              </a>
+                            ) : (
+                              <span>{row.details}</span>
+                            );
+
+                            if (!isEditing || !fieldKey) return detailContent;
+
+                            return (
+                              <div className="group">
+                                {detailContent}
+                                <div className="flex gap-1 mt-1 opacity-70 group-hover:opacity-100">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-5 text-xs gap-0.5"
+                                    onClick={() => setNotesEdit({ eventId: event.id, field: fieldKey, value: (event as any)[fieldKey] || '' })}
+                                  >
+                                    <Pencil className="h-2.5 w-2.5" /> Edit
                                   </Button>
-                                  <Button variant="ghost" size="sm" className="h-5 text-xs gap-0.5" onClick={() => setLinkForm({ eventId: event.id, label: '', url: '', mode: 'note' })}>
-                                    <Plus className="h-2.5 w-2.5" /> Add note
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-5 text-xs gap-0.5 text-primary"
+                                    onClick={() => setFieldLinkEdit({ eventId: event.id, field: fieldKey, url: fieldUrl || '' })}
+                                  >
+                                    <LinkIcon className="h-2.5 w-2.5" /> {fieldUrl ? 'Edit link' : 'Add link'}
                                   </Button>
+                                  {fieldUrl && (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-5 text-xs gap-0.5 text-destructive"
+                                      onClick={() => {
+                                        const updated = { ...(event.fieldUrls || {}) };
+                                        delete updated[fieldKey];
+                                        updateEvent(event.id, { fieldUrls: updated });
+                                      }}
+                                    >
+                                      <X className="h-2.5 w-2.5" /> Remove link
+                                    </Button>
+                                  )}
                                 </div>
-                              )}
-                            </div>
-                          )}
+                              </div>
+                            );
+                          })()}
                         </td>
-                      )}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          );
-        })}
+                        {ri === 0 && (
+                          <td className="p-2 align-top text-xs text-muted-foreground" rowSpan={table.rows.length}>
+                            {!isEditing && event.links.length > 0 && (
+                              <ul className="list-disc list-inside space-y-1">
+                                {event.links.map((link, li) => (
+                                  <li key={li}>
+                                    {link.url ? (
+                                      <a href={link.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline inline-flex items-center gap-0.5">
+                                        <ExternalLink className="h-2.5 w-2.5 inline shrink-0" /> {link.label}
+                                      </a>
+                                    ) : (
+                                      <span>{link.label}</span>
+                                    )}
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                            {isEditing && (
+                              <div className="space-y-1">
+                                {event.links.map((link, li) => (
+                                  <div key={li} className="flex items-center gap-1">
+                                    {link.url ? (
+                                      <a href={link.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-0.5 truncate">
+                                        <ExternalLink className="h-2.5 w-2.5 shrink-0" /> {link.label}
+                                      </a>
+                                    ) : (
+                                      <span className="truncate">📝 {link.label}</span>
+                                    )}
+                                    <Button variant="ghost" size="sm" className="h-5 w-5 p-0 text-destructive shrink-0" onClick={() => removeLink(event.id, li)}>
+                                      <X className="h-2.5 w-2.5" />
+                                    </Button>
+                                  </div>
+                                ))}
+                                {linkForm?.eventId === event.id ? (
+                                  <div className="space-y-1 mt-1">
+                                    <Input className="h-6 text-xs" placeholder={linkForm.mode === 'link' ? 'Label' : 'Note text'} value={linkForm.label} onChange={e => setLinkForm({ ...linkForm, label: e.target.value })} />
+                                    {linkForm.mode === 'link' && (
+                                      <Input className="h-6 text-xs" placeholder="https://..." value={linkForm.url} onChange={e => setLinkForm({ ...linkForm, url: e.target.value })} />
+                                    )}
+                                    <div className="flex gap-1">
+                                      <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={() => {
+                                        if (linkForm.label) {
+                                          addLink(event.id, linkForm.mode === 'link' ? { label: linkForm.label, url: linkForm.url } : { label: linkForm.label });
+                                          setLinkForm(null);
+                                        }
+                                      }}>
+                                        <Check className="h-3 w-3 mr-0.5" /> Save
+                                      </Button>
+                                      <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={() => setLinkForm(null)}>
+                                        Cancel
+                                      </Button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="flex gap-1 mt-1">
+                                    <Button variant="ghost" size="sm" className="h-5 text-xs gap-0.5 text-primary" onClick={() => setLinkForm({ eventId: event.id, label: '', url: '', mode: 'link' })}>
+                                      <LinkIcon className="h-2.5 w-2.5" /> Add link
+                                    </Button>
+                                    <Button variant="ghost" size="sm" className="h-5 text-xs gap-0.5" onClick={() => setLinkForm({ eventId: event.id, label: '', url: '', mode: 'note' })}>
+                                      <Plus className="h-2.5 w-2.5" /> Add note
+                                    </Button>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </td>
+                        )}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            );
+
+            if (isDraggable) {
+              return (
+                <SortableItem key={`${event.id}-${entry.isBookend || idx}`} id={event.id}>
+                  {eventContent}
+                </SortableItem>
+              );
+            }
+            return <div key={`${event.id}-${entry.isBookend || ''}`} className="ml-5">{eventContent}</div>;
+          })}
+        </SortableList>
 
         {timeline.length === 0 && (
           <p className="text-center text-muted-foreground py-12">

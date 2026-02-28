@@ -89,7 +89,7 @@ export default function ExportPreview() {
       y += 6;
     }
 
-    if (project.metadata.startDate) {
+    if (project.metadata.startDate && project.metadata.startDate.length > 0) {
       doc.setFontSize(11);
       doc.setFont('helvetica', 'bold');
       doc.text('Dates:', margin, y);
@@ -202,7 +202,7 @@ export default function ExportPreview() {
             {project.metadata.travelers.map(t => `${t.name}${t.isMinor ? ' (minor)' : ''}`).join(', ')}
           </div>
         )}
-        {project.metadata.startDate && (
+        {project.metadata.startDate && project.metadata.startDate.length > 0 && (
           <div className="text-sm">
             <span className="font-semibold">Dates: </span>
             {formatDate(project.metadata.startDate)} – {project.metadata.endDate ? formatDate(project.metadata.endDate) : 'TBD'}

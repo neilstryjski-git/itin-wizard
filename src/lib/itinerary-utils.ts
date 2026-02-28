@@ -225,7 +225,7 @@ export interface TimelineEntry {
   isBookend?: 'check-in' | 'check-out';
 }
 
-export function buildTimeline(events: ItineraryEvent[]): TimelineEntry[] {
+export function buildTimeline(events: ItineraryEvent[], options?: { preserveOrder?: boolean }): TimelineEntry[] {
   const entries: TimelineEntry[] = [];
   for (const ev of events) {
     // Normalize dates for reliable sorting
@@ -258,6 +258,11 @@ export function buildTimeline(events: ItineraryEvent[]): TimelineEntry[] {
     } else {
       entries.push({ event: ev, displayType: ev.type, displayDate: normDate, displayTime: ev.time });
     }
+  }
+
+  // When preserveOrder is true, keep the input array order (still expanding accommodations inline)
+  if (options?.preserveOrder) {
+    return entries;
   }
 
   // Sort chronologically using numeric Date comparison (not string)

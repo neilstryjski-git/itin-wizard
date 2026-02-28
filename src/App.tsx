@@ -10,6 +10,7 @@ import Phase1Interview from "@/pages/Phase1Interview";
 import Phase2Itinerary from "@/pages/Phase2Itinerary";
 import Phase3Packing from "@/pages/Phase3Packing";
 import Roadmap from "@/pages/Roadmap";
+import ExportPreview from "@/pages/ExportPreview";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -28,6 +29,7 @@ const App = () => (
               <Route path="/project/:projectId/interview" element={<Phase1Interview />} />
               <Route path="/project/:projectId/itinerary" element={<Phase2Itinerary />} />
               <Route path="/project/:projectId/packing" element={<Phase3Packing />} />
+              <Route path="/project/:projectId/export" element={<ExportPreview />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>

@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 import {
   Pencil, Save, X, AlertTriangle, Plus, Trash2, Plane, Hotel,
-  MapPin, Clock, Link as LinkIcon, FileText, ArrowRight,
+  MapPin, Clock, Link as LinkIcon, FileText, ArrowRight, Loader2, Sparkles, Check,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useProjectsContext } from '@/contexts/ProjectsContext';
 import { ItineraryEvent, TravelLink, FileAttachment } from '@/types/project';
 import { FileDropZone, AttachmentList } from '@/components/FileDropZone';
+import { supabase } from '@/integrations/supabase/client';
 
 const EVENT_ICONS: Record<string, any> = {
   'flight-departure': Plane,
@@ -41,6 +43,38 @@ export default function Phase2Itinerary() {
   const [rawInput, setRawInput] = useState(project?.phase_2_itinerary.rawInput || '');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<ItineraryEvent>>({});
+  const [isParsing, setIsParsing] = useState(false);
+  const [previewEvents, setPreviewEvents] = useState<Partial<ItineraryEvent>[]>([]);
+
+  const parseAndAddCb = useCallback(async () => {
+    if (!rawInput.trim() || !projectId) return;
+    setIsParsing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('parse-itinerary', {
+        body: { text: rawInput },
+      });
+      if (error) throw error;
+      const events: Partial<ItineraryEvent>[] = (data.events || []).map((ev: any) => ({
+        ...ev,
+        id: crypto.randomUUID(),
+        links: ev.links || [],
+      }));
+      if (events.length === 0) {
+        toast.info('No events could be extracted. Try adding more detail.');
+        const fallback = parseRawInput(rawInput);
+        setPreviewEvents(fallback);
+      } else {
+        setPreviewEvents(events);
+      }
+    } catch (err) {
+      console.error('AI parse failed, falling back to regex:', err);
+      toast.error('AI parsing unavailable, using local parser.');
+      const fallback = parseRawInput(rawInput);
+      setPreviewEvents(fallback);
+    } finally {
+      setIsParsing(false);
+    }
+  }, [rawInput, projectId]);
 
   if (!project) { navigate('/'); return null; }
 
@@ -68,16 +102,47 @@ export default function Phase2Itinerary() {
     `${a.displayDate}${a.displayTime || ''}`.localeCompare(`${b.displayDate}${b.displayTime || ''}`)
   );
 
-  const parseAndAdd = () => {
-    if (!rawInput.trim()) return;
-    const parsed = parseRawInput(rawInput);
+  const parseAndAdd = parseAndAddCb;
+
+  const confirmPreview = () => {
+    const eventsToAdd = previewEvents.map(ev => ({
+      id: ev.id || crypto.randomUUID(),
+      type: ev.type || 'activity',
+      title: ev.title || 'Untitled Event',
+      date: ev.date || new Date().toISOString().split('T')[0],
+      endDate: ev.endDate,
+      time: ev.time,
+      location: ev.location,
+      address: ev.address,
+      confirmationCode: ev.confirmationCode,
+      flightNumber: ev.flightNumber,
+      notes: ev.notes,
+      links: ev.links || [],
+      attachments: ev.attachments || [],
+    } as ItineraryEvent));
+
     updateProject(projectId!, p => ({
       ...p,
       phase_2_itinerary: {
         rawInput,
-        events: [...p.phase_2_itinerary.events, ...parsed],
+        events: [...p.phase_2_itinerary.events, ...eventsToAdd],
       },
     }));
+    setPreviewEvents([]);
+    setRawInput('');
+    toast.success(`${eventsToAdd.length} event(s) added to itinerary.`);
+  };
+
+  const cancelPreview = () => {
+    setPreviewEvents([]);
+  };
+
+  const updatePreviewEvent = (index: number, updates: Partial<ItineraryEvent>) => {
+    setPreviewEvents(prev => prev.map((ev, i) => i === index ? { ...ev, ...updates } : ev));
+  };
+
+  const removePreviewEvent = (index: number) => {
+    setPreviewEvents(prev => prev.filter((_, i) => i !== index));
   };
 
   const addBlankEvent = () => {
@@ -190,12 +255,88 @@ export default function Phase2Itinerary() {
             onChange={e => setRawInput(e.target.value)}
             placeholder="Paste your booking confirmations, flight details, hotel reservations here..."
             rows={4}
+            disabled={isParsing}
           />
-          <Button size="sm" onClick={parseAndAdd} variant="secondary">
-            Parse & Add Events
+          <Button size="sm" onClick={parseAndAdd} variant="secondary" disabled={isParsing || !rawInput.trim()}>
+            {isParsing ? (
+              <><Loader2 className="h-3 w-3 animate-spin mr-1" /> Analyzing...</>
+            ) : (
+              <><Sparkles className="h-3 w-3 mr-1" /> Parse with AI</>
+            )}
           </Button>
         </CardContent>
       </Card>
+
+      {/* Preview Step */}
+      {previewEvents.length > 0 && (
+        <Card className="mb-8 border-primary/30 bg-primary/5">
+          <CardContent className="p-4 space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-sm font-semibold">
+                <Sparkles className="h-4 w-4 text-primary" />
+                Review parsed events ({previewEvents.length})
+              </div>
+              <div className="flex gap-2">
+                <Button size="sm" variant="outline" onClick={cancelPreview}>
+                  <X className="h-3 w-3 mr-1" /> Discard
+                </Button>
+                <Button size="sm" onClick={confirmPreview}>
+                  <Check className="h-3 w-3 mr-1" /> Add All
+                </Button>
+              </div>
+            </div>
+            <div className="space-y-3">
+              {previewEvents.map((ev, i) => {
+                const Icon = EVENT_ICONS[ev.type || 'activity'] || MapPin;
+                return (
+                  <Card key={ev.id || i} className="bg-background">
+                    <CardContent className="p-3 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Icon className="h-4 w-4 text-muted-foreground" />
+                        <Select value={ev.type || 'activity'} onValueChange={v => updatePreviewEvent(i, { type: v as any })}>
+                          <SelectTrigger className="h-7 w-[160px] text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {Object.entries(EVENT_LABELS).map(([k, v]) => (
+                              <SelectItem key={k} value={k}>{v}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Input
+                          className="h-7 text-sm font-medium flex-1"
+                          value={ev.title || ''}
+                          onChange={e => updatePreviewEvent(i, { title: e.target.value })}
+                        />
+                        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive shrink-0" onClick={() => removePreviewEvent(i)}>
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                      <div className={`grid gap-2 ${ev.type === 'accommodation' ? 'grid-cols-4' : 'grid-cols-3'}`}>
+                        <Input type="date" className="h-7 text-xs" value={ev.date || ''} onChange={e => updatePreviewEvent(i, { date: e.target.value })} />
+                        {ev.type === 'accommodation' && (
+                          <Input type="date" className="h-7 text-xs" value={ev.endDate || ''} onChange={e => updatePreviewEvent(i, { endDate: e.target.value })} placeholder="Check-out" />
+                        )}
+                        <Input type="time" className="h-7 text-xs" value={ev.time || ''} onChange={e => updatePreviewEvent(i, { time: e.target.value })} />
+                        <Input className="h-7 text-xs" placeholder="Location" value={ev.location || ''} onChange={e => updatePreviewEvent(i, { location: e.target.value })} />
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <Input className="h-7 text-xs" placeholder="Confirmation code" value={ev.confirmationCode || ''} onChange={e => updatePreviewEvent(i, { confirmationCode: e.target.value })} />
+                        {(ev.type === 'flight-departure' || ev.type === 'flight-arrival') && (
+                          <Input className="h-7 text-xs" placeholder="Flight #" value={ev.flightNumber || ''} onChange={e => updatePreviewEvent(i, { flightNumber: e.target.value })} />
+                        )}
+                      </div>
+                      {ev.notes && (
+                        <Input className="h-7 text-xs" placeholder="Notes" value={ev.notes || ''} onChange={e => updatePreviewEvent(i, { notes: e.target.value })} />
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Timeline */}
       <div className="space-y-3">

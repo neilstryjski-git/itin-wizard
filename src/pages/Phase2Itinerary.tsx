@@ -389,77 +389,247 @@ function EditForm({
 
 function parseRawInput(text: string): ItineraryEvent[] {
   const events: ItineraryEvent[] = [];
-  const lines = text.split('\n').filter(l => l.trim());
 
-  for (const line of lines) {
-    const lower = line.toLowerCase();
-    let type: ItineraryEvent['type'] = 'activity';
+  // Split into blocks separated by blank lines, or treat each line as a block
+  const blocks = text.includes('\n\n')
+    ? text.split(/\n\s*\n/).filter(b => b.trim())
+    : text.split('\n').filter(l => l.trim()).map(l => l);
 
-    if (/flight|fly|depart/i.test(lower) && /arriv/i.test(lower)) {
-      // Both departure and arrival
+  for (const block of blocks) {
+    const fullText = block.trim();
+    const lower = fullText.toLowerCase();
+
+    // Extract all structured data from the block
+    const date = extractDate(fullText);
+    const time = extractTime(fullText);
+    const confirmation = extractConfirmation(fullText);
+    const flightNumber = extractFlightNumber(fullText);
+    const location = extractLocation(fullText);
+    const address = extractAddress(fullText);
+    const links = extractUrls(fullText);
+    const title = extractTitle(fullText);
+
+    // Determine event type
+    if (/flight|fly/i.test(lower) && /depart/i.test(lower) && /arriv/i.test(lower)) {
       events.push({
-        id: crypto.randomUUID(), type: 'flight-departure', title: line.trim(),
-        date: extractDate(line), time: extractTime(line), links: [],
+        id: crypto.randomUUID(), type: 'flight-departure', title: title || 'Flight Departure',
+        date, time, location, flightNumber, confirmationCode: confirmation, links,
       });
       events.push({
-        id: crypto.randomUUID(), type: 'flight-arrival', title: line.trim(),
-        date: extractDate(line), links: [],
+        id: crypto.randomUUID(), type: 'flight-arrival', title: title || 'Flight Arrival',
+        date, links: [],
       });
-      continue;
-    } else if (/flight|fly|depart/i.test(lower)) {
-      type = 'flight-departure';
-    } else if (/arriv|land/i.test(lower)) {
-      type = 'flight-arrival';
-    } else if (/check.?in|arrival.*hotel|hotel.*arriv/i.test(lower)) {
-      type = 'check-in';
-    } else if (/check.?out|depart.*hotel|hotel.*depart/i.test(lower)) {
-      type = 'check-out';
-    } else if (/hotel|resort|stay|airbnb|lodge/i.test(lower)) {
-      // Create check-in and check-out
+    } else if (/flight|airline|air\s|depart.*flight|fly/i.test(lower)) {
+      const type = /arriv|land/i.test(lower) ? 'flight-arrival' : 'flight-departure';
       events.push({
-        id: crypto.randomUUID(), type: 'check-in', title: `Check-in: ${line.trim()}`,
-        date: extractDate(line), links: [],
+        id: crypto.randomUUID(), type, title: title || (type === 'flight-departure' ? 'Flight Departure' : 'Flight Arrival'),
+        date, time, location, flightNumber, confirmationCode: confirmation, links,
+      });
+    } else if (/check.?in/i.test(lower)) {
+      events.push({
+        id: crypto.randomUUID(), type: 'check-in', title: title || 'Check-in',
+        date, time: time || '15:00', location, address, confirmationCode: confirmation, links,
+      });
+    } else if (/check.?out/i.test(lower)) {
+      events.push({
+        id: crypto.randomUUID(), type: 'check-out', title: title || 'Check-out',
+        date, time: time || '11:00', location, address, confirmationCode: confirmation, links,
+      });
+    } else if (/hotel|resort|stay|airbnb|lodge|inn|hostel|villa/i.test(lower)) {
+      const dates = extractDateRange(fullText);
+      events.push({
+        id: crypto.randomUUID(), type: 'check-in',
+        title: `Check-in: ${title || 'Accommodation'}`,
+        date: dates[0] || date, time: time || '15:00',
+        location, address, confirmationCode: confirmation, links,
       });
       events.push({
-        id: crypto.randomUUID(), type: 'check-out', title: `Check-out: ${line.trim()}`,
-        date: extractDate(line), links: [],
+        id: crypto.randomUUID(), type: 'check-out',
+        title: `Check-out: ${title || 'Accommodation'}`,
+        date: dates[1] || date, time: '11:00',
+        location, address, links: [],
       });
-      continue;
-    } else if (/transfer|shuttle|taxi|uber/i.test(lower)) {
-      type = 'transfer';
+    } else if (/transfer|shuttle|taxi|uber|lyft|pickup|drop.?off/i.test(lower)) {
+      events.push({
+        id: crypto.randomUUID(), type: 'transfer', title: title || 'Transfer',
+        date, time, location, confirmationCode: confirmation, links,
+      });
+    } else {
+      events.push({
+        id: crypto.randomUUID(), type: 'activity', title: title || fullText.split('\n')[0],
+        date, time, location, address, confirmationCode: confirmation, links,
+        notes: extractNotes(fullText),
+      });
     }
-
-    events.push({
-      id: crypto.randomUUID(),
-      type,
-      title: line.trim(),
-      date: extractDate(line),
-      time: extractTime(line),
-      links: [],
-    });
   }
 
   return events;
 }
 
 function extractDate(text: string): string {
-  const match = text.match(/\d{4}-\d{2}-\d{2}/) || text.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-  if (match) {
-    if (match[0].includes('/')) {
-      return `${match[3]}-${match[1].padStart(2, '0')}-${match[2].padStart(2, '0')}`;
-    }
-    return match[0];
+  // ISO format: 2026-03-10
+  const iso = text.match(/\d{4}-\d{2}-\d{2}/);
+  if (iso) return iso[0];
+
+  // US format: 03/10/2026 or 3/10/2026
+  const us = text.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (us) return `${us[3]}-${us[1].padStart(2, '0')}-${us[2].padStart(2, '0')}`;
+
+  // Written format: March 10, 2026 or Mar 10 2026
+  const months: Record<string, string> = {
+    jan: '01', feb: '02', mar: '03', apr: '04', may: '05', jun: '06',
+    jul: '07', aug: '08', sep: '09', oct: '10', nov: '11', dec: '12',
+  };
+  const written = text.match(/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+(\d{1,2}),?\s*(\d{4})/i);
+  if (written) {
+    const m = months[written[1].toLowerCase().slice(0, 3)];
+    return `${written[3]}-${m}-${written[2].padStart(2, '0')}`;
   }
+
+  // Day Month Year: 10 March 2026
+  const dmy = text.match(/\b(\d{1,2})\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?,?\s*(\d{4})/i);
+  if (dmy) {
+    const m = months[dmy[2].toLowerCase().slice(0, 3)];
+    return `${dmy[3]}-${m}-${dmy[1].padStart(2, '0')}`;
+  }
+
   return new Date().toISOString().split('T')[0];
 }
 
+function extractDateRange(text: string): [string, string] {
+  const dates: string[] = [];
+
+  // Find all ISO dates
+  const isoMatches = text.matchAll(/\d{4}-\d{2}-\d{2}/g);
+  for (const m of isoMatches) dates.push(m[0]);
+  if (dates.length >= 2) return [dates[0], dates[1]];
+
+  // Find written date ranges like "March 10 - March 15, 2026"
+  const months: Record<string, string> = {
+    jan: '01', feb: '02', mar: '03', apr: '04', may: '05', jun: '06',
+    jul: '07', aug: '08', sep: '09', oct: '10', nov: '11', dec: '12',
+  };
+  const rangeMatch = text.match(
+    /\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+(\d{1,2})\s*[-–—to]+\s*(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)?[a-z]*\.?\s*(\d{1,2}),?\s*(\d{4})/i
+  );
+  if (rangeMatch) {
+    const m1 = months[rangeMatch[1].toLowerCase().slice(0, 3)];
+    const m2 = rangeMatch[3] ? months[rangeMatch[3].toLowerCase().slice(0, 3)] : m1;
+    return [
+      `${rangeMatch[5]}-${m1}-${rangeMatch[2].padStart(2, '0')}`,
+      `${rangeMatch[5]}-${m2}-${rangeMatch[4].padStart(2, '0')}`,
+    ];
+  }
+
+  const d = extractDate(text);
+  return [d, d];
+}
+
 function extractTime(text: string): string | undefined {
-  const match = text.match(/(\d{1,2}):(\d{2})\s*(am|pm)?/i);
+  // 23:55, 11:55 PM, 3:00pm
+  const match = text.match(/\b(\d{1,2}):(\d{2})\s*(am|pm|AM|PM)?\b/);
   if (match) {
     let hours = parseInt(match[1]);
-    if (match[3]?.toLowerCase() === 'pm' && hours < 12) hours += 12;
-    if (match[3]?.toLowerCase() === 'am' && hours === 12) hours = 0;
+    const ampm = match[3]?.toLowerCase();
+    if (ampm === 'pm' && hours < 12) hours += 12;
+    if (ampm === 'am' && hours === 12) hours = 0;
     return `${hours.toString().padStart(2, '0')}:${match[2]}`;
   }
   return undefined;
+}
+
+function extractConfirmation(text: string): string | undefined {
+  // Common patterns: Confirmation: XJ882K, Conf#: ABC123, Booking ref: XYZ
+  const confMatch = text.match(/(?:confirmation|conf\.?|booking\s*(?:ref|#|number|no)|reservation\s*(?:#|number|no)|PNR|record\s*locator)\s*[:#]\s*([A-Z0-9]{4,10})/i);
+  if (confMatch) return confMatch[1].toUpperCase();
+
+  // Standalone 6-char alphanumeric that looks like a booking code (has both letters and numbers)
+  const standalone = text.match(/\b([A-Z]{1,2}\d{3,4}[A-Z]?|[A-Z0-9]{6})\b/);
+  if (standalone && /[A-Z]/.test(standalone[1]) && /\d/.test(standalone[1]) && standalone[1].length === 6) {
+    return standalone[1];
+  }
+
+  return undefined;
+}
+
+function extractFlightNumber(text: string): string | undefined {
+  // AC1234, WS 302, UA 456, etc.
+  const match = text.match(/\b([A-Z]{2})\s*(\d{1,4})\b/);
+  if (match) return `${match[1]}${match[2]}`;
+  return undefined;
+}
+
+function extractLocation(text: string): string | undefined {
+  // Airport codes: YYZ, LAX, BZE (3-letter uppercase in parens or standalone)
+  const airportMatch = text.match(/\b([A-Z]{3})\s*(?:\(([^)]+)\))?/);
+
+  // "at Location", "from Location", "to Location", "in Location"
+  const prepMatch = text.match(/\b(?:at|from|to|in|@)\s+([A-Z][A-Za-z\s,]+?)(?:\s*[-–|,\n]|$)/);
+
+  // Location: Something
+  const labelMatch = text.match(/(?:location|place|venue|airport)[:\s]+(.+?)(?:\n|$)/i);
+
+  if (labelMatch) return labelMatch[1].trim();
+  if (prepMatch) return prepMatch[1].trim();
+  if (airportMatch && airportMatch[2]) return `${airportMatch[1]} (${airportMatch[2]})`;
+
+  return undefined;
+}
+
+function extractAddress(text: string): string | undefined {
+  const match = text.match(/(?:address|addr|street|located at)[:\s]+(.+?)(?:\n|$)/i);
+  if (match) return match[1].trim();
+
+  // Street address pattern: number + street name
+  const streetMatch = text.match(/\b(\d+\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\s+(?:St|Street|Ave|Avenue|Blvd|Boulevard|Dr|Drive|Rd|Road|Ln|Lane|Way|Pl|Place)\.?)/i);
+  if (streetMatch) return streetMatch[1].trim();
+
+  return undefined;
+}
+
+function extractUrls(text: string): { label: string; url: string }[] {
+  const links: { label: string; url: string }[] = [];
+  const urlRegex = /(https?:\/\/[^\s,)]+)/g;
+  let match;
+  while ((match = urlRegex.exec(text)) !== null) {
+    const url = match[1];
+    // Try to find a label before the URL
+    const before = text.slice(Math.max(0, match.index - 60), match.index);
+    const labelMatch = before.match(/([A-Za-z][A-Za-z\s]+?)(?:\s*[-:–]\s*|\s+)$/);
+    const label = labelMatch ? labelMatch[1].trim() : new URL(url).hostname;
+    links.push({ label, url });
+  }
+  return links;
+}
+
+function extractTitle(text: string): string {
+  const firstLine = text.split('\n')[0].trim();
+  let title = firstLine
+    .replace(/\d{4}-\d{2}-\d{2}/g, '')
+    .replace(/\d{1,2}\/\d{1,2}\/\d{4}/g, '')
+    .replace(/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+\d{1,2},?\s*\d{4}/gi, '')
+    .replace(/\d{1,2}:\d{2}\s*(am|pm)?/gi, '')
+    .replace(/(?:confirmation|conf\.?|booking\s*ref)[:\s#]*[A-Z0-9]+/gi, '')
+    .replace(/https?:\/\/\S+/g, '')
+    .replace(/\b(departing|arriving|from|to|at)\b/gi, '')
+    .replace(/\b[A-Z]{2}\d{1,4}\b/g, '') // strip flight numbers
+    .replace(/\b[A-Z]{3}\s*\([^)]+\)/g, '') // strip airport codes with city
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+
+  title = title.replace(/^[-–|,\s]+|[-–|,\s]+$/g, '').trim();
+  return title || firstLine;
+  return title || firstLine;
+}
+
+function extractNotes(text: string): string | undefined {
+  const lines = text.split('\n').slice(1).filter(l => l.trim());
+  // Filter out lines that are purely dates, urls, or confirmation codes
+  const noteLines = lines.filter(l => {
+    const trimmed = l.trim();
+    if (/^https?:\/\//.test(trimmed)) return false;
+    if (/^(?:confirm|conf|booking|date|time|location|address)/i.test(trimmed)) return false;
+    return true;
+  });
+  return noteLines.length > 0 ? noteLines.join('; ').slice(0, 200) : undefined;
 }

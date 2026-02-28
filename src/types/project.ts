@@ -1,6 +1,6 @@
 export interface TravelLink {
   label: string;
-  url: string;
+  url?: string; // Optional — if empty, this is a plain text note
 }
 
 export interface FileAttachment {

@@ -21,8 +21,19 @@ export const EVENT_TYPE_LABELS: Record<string, string> = {
 export function formatDate(dateStr: string): string {
   if (!dateStr) return '';
   try {
-    const d = new Date(dateStr + 'T00:00:00');
     const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    // Try parsing as YYYY-MM-DD first
+    const parts = dateStr.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+    if (parts) {
+      const d = new Date(Number(parts[1]), Number(parts[2]) - 1, Number(parts[3]));
+      const day = d.getDate().toString().padStart(2, '0');
+      const month = (d.getMonth() + 1).toString().padStart(2, '0');
+      const year = d.getFullYear().toString().slice(-2);
+      return `${day}/${month}/${year} (${days[d.getDay()]})`;
+    }
+    // Fallback: try native Date parsing for free-text dates like "March 15, 2026"
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr; // Can't parse, return as-is
     const day = d.getDate().toString().padStart(2, '0');
     const month = (d.getMonth() + 1).toString().padStart(2, '0');
     const year = d.getFullYear().toString().slice(-2);

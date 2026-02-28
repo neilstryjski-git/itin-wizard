@@ -174,7 +174,7 @@ export default function Phase1Interview() {
             <h3 className="font-heading font-semibold text-lg mb-3">Requirements Checklist</h3>
             <Card className="p-4 space-y-2">
               {project.phase_1_requirements.checklist.map(item => (
-                <label key={item.id} className="flex items-start gap-2 cursor-pointer group">
+                <div key={item.id} className="flex items-start gap-2 group py-1">
                   <input
                     type="checkbox"
                     checked={item.checked}
@@ -189,15 +189,26 @@ export default function Phase1Interview() {
                         },
                       }));
                     }}
-                    className="mt-1 h-4 w-4 rounded accent-primary"
+                    className="mt-1 h-4 w-4 rounded accent-primary cursor-pointer"
                   />
-                  <span className={`text-sm ${item.checked ? 'line-through text-muted-foreground' : ''}`}>
-                    {item.text}
-                    {item.autoAdded && (
-                      <span className="ml-1 text-xs text-warning">⚡ Auto-detected</span>
+                  <div className="flex-1">
+                    <span className={`text-sm font-medium ${item.checked ? 'line-through text-muted-foreground' : ''}`}>
+                      {item.title}
+                      {item.autoAdded && (
+                        <span className="ml-1 text-xs text-warning">⚡ Auto-detected</span>
+                      )}
+                    </span>
+                    {item.description && (
+                      <p className="text-xs text-muted-foreground mt-0.5">{item.description}</p>
                     )}
-                  </span>
-                </label>
+                    {item.url && (
+                      <a href={item.url} target="_blank" rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-xs text-primary hover:underline mt-0.5">
+                        🔗 {item.url_label || item.url}
+                      </a>
+                    )}
+                  </div>
+                </div>
               ))}
             </Card>
             <Button
@@ -243,17 +254,19 @@ function generateChecklist(project: any, lastInput: string, currentStep: number)
   // Determine destination - might come from step index 1
   const dest = md.destination?.toLowerCase() || '';
 
-  items.push({ id: id(), text: 'Valid passports for all travelers', checked: false });
-  items.push({ id: id(), text: 'Travel insurance purchased', checked: false });
-  items.push({ id: id(), text: 'Copies of all booking confirmations', checked: false });
-  items.push({ id: id(), text: 'Emergency contact information sheet', checked: false });
+  items.push({ id: id(), title: 'Valid passports for all travelers', checked: false });
+  items.push({ id: id(), title: 'Travel insurance purchased', checked: false });
+  items.push({ id: id(), title: 'Copies of all booking confirmations', checked: false });
+  items.push({ id: id(), title: 'Emergency contact information sheet', checked: false });
 
   if (dest.includes('belize')) {
     items.push({
       id: id(),
-      text: 'Complete Digital E-Embarkation Form at ideclare.gov.bz',
+      title: 'Complete Digital E-Embarkation Form at ideclare.gov.bz',
       checked: false,
       autoAdded: true,
+      url: 'https://ideclare.gov.bz',
+      url_label: 'Official Belize Immigration Portal',
     });
   }
 
@@ -261,7 +274,7 @@ function generateChecklist(project: any, lastInput: string, currentStep: number)
   if (hasMinors && transitUSA) {
     items.push({
       id: id(),
-      text: 'Notarized Consent Letters for minor travelers (required for USA transit)',
+      title: 'Notarized Consent Letters for minor travelers (required for USA transit)',
       checked: false,
       autoAdded: true,
     });
@@ -270,9 +283,11 @@ function generateChecklist(project: any, lastInput: string, currentStep: number)
   if (transitUSA) {
     items.push({
       id: id(),
-      text: 'ESTA authorization for USA transit',
+      title: 'ESTA authorization for USA transit',
       checked: false,
       autoAdded: true,
+      url: 'https://esta.cbp.dhs.gov',
+      url_label: 'ESTA Application Portal',
     });
   }
 

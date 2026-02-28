@@ -27,7 +27,7 @@ export function ExportButton({ projectId }: { projectId: string }) {
       add('REQUIREMENTS CHECKLIST');
       add('-'.repeat(30));
       project.phase_1_requirements.checklist.forEach(item => {
-        add(`  [${item.checked ? 'X' : ' '}] ${item.text}${item.autoAdded ? ' ⚡' : ''}`);
+        add(`  [${item.checked ? 'X' : ' '}] ${item.title}${item.autoAdded ? ' ⚡' : ''}`);
       });
       br();
     }

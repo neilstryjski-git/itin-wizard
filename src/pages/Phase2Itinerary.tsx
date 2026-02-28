@@ -201,9 +201,18 @@ export default function Phase2Itinerary() {
                             </span>
                           )}
                         </div>
-                        {event.confirmationCode && (
+                        {(event.flightNumber || event.confirmationCode) && (
                           <p className="text-xs mt-1 text-muted-foreground">
-                            Conf: <span className="font-mono">{event.confirmationCode}</span>
+                            {event.flightNumber && <><span className="font-mono">{event.flightNumber}</span> · </>}
+                            {event.confirmationCode && <>Conf: <span className="font-mono">{event.confirmationCode}</span></>}
+                          </p>
+                        )}
+                        {event.address && (
+                          <p className="text-xs mt-0.5 text-muted-foreground">📍 {event.address}</p>
+                        )}
+                        {event.missingFields && event.missingFields.length > 0 && (
+                          <p className="text-xs mt-1 text-warning flex items-center gap-1">
+                            <AlertTriangle className="h-3 w-3" /> Missing: {event.missingFields.join(', ')}
                           </p>
                         )}
                         {event.links.length > 0 && (

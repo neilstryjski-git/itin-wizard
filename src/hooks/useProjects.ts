@@ -1,12 +1,20 @@
 import { useState, useEffect, useCallback } from 'react';
 import { TravelProject } from '@/types/project';
+import { SEED_PROJECT } from '@/data/seed';
 
 const STORAGE_KEY = 'travel-architect-projects';
+const SEEDED_KEY = 'travel-architect-seeded';
 
 function loadProjects(): TravelProject[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
+    if (raw) return JSON.parse(raw);
+    // Auto-seed on first load
+    if (!localStorage.getItem(SEEDED_KEY)) {
+      localStorage.setItem(SEEDED_KEY, 'true');
+      return [SEED_PROJECT];
+    }
+    return [];
   } catch {
     return [];
   }

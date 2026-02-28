@@ -5,8 +5,12 @@ export interface TravelLink {
 
 export interface RequirementItem {
   id: string;
-  text: string;
+  title: string;
+  description?: string;
   checked: boolean;
+  status?: 'pending' | 'done';
+  url?: string;
+  url_label?: string;
   autoAdded?: boolean;
 }
 
@@ -20,6 +24,9 @@ export interface ItineraryEvent {
   notes?: string;
   links: TravelLink[];
   confirmationCode?: string;
+  flightNumber?: string;
+  address?: string;
+  missingFields?: string[];
 }
 
 export interface PackingItem {
@@ -27,6 +34,7 @@ export interface PackingItem {
   name: string;
   category: string;
   checked: boolean;
+  assignedTo?: string;
   autoAdded?: boolean;
 }
 
@@ -44,10 +52,12 @@ export interface TravelProject {
     destination: string;
     startDate?: string;
     endDate?: string;
-    travelers: { name: string; isMinor: boolean }[];
+    travelers: { name: string; isMinor: boolean; passport?: string }[];
     transitViaUSA: boolean;
+    transitCountry?: string;
     createdAt: string;
     updatedAt: string;
+    status?: 'active' | 'archived';
   };
   phase_1_requirements: {
     completed: boolean;
@@ -73,6 +83,7 @@ export const createNewProject = (): TravelProject => ({
     transitViaUSA: false,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
+    status: 'active',
   },
   phase_1_requirements: {
     completed: false,

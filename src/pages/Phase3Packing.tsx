@@ -218,6 +218,9 @@ export default function Phase3Packing() {
                           {item.name}
                           {item.autoAdded && <span className="ml-1 text-xs text-warning">⚡</span>}
                         </span>
+                        {item.assignedTo && (
+                          <span className="text-xs text-muted-foreground ml-2">({item.assignedTo})</span>
+                        )}
                       </label>
                       <Button
                         variant="ghost"

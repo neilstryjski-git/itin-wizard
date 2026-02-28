@@ -113,12 +113,29 @@ export default function ExportPreview() {
 
       const table = buildEventTable(event);
       const pdfNotes = stripEmoji(table.notes);
+
+      // Build a map of field URLs and location auto-links for clickable PDF links
+      const fieldMap: Record<string, string> = {
+        'Location': 'location', 'Departure': 'departureLocation', 'Arrival': 'arrivalLocation',
+      };
+      const detailUrls: Record<number, string> = {};
+      table.rows.forEach((r, i) => {
+        const fk = fieldMap[r.field];
+        const fieldUrl = fk && event.fieldUrls?.[fk];
+        const isLoc = ['Location', 'Departure', 'Arrival'].includes(r.field);
+        const url = fieldUrl || (isLoc && r.details ? googleMapsUrl(r.details) : '');
+        if (url) detailUrls[i] = url;
+      });
+
+      // Collect link URLs from notes column
+      const linkUrls: string[] = event.links.map(l => l.url || '');
+
       const bodyRows = table.rows.map((r, i) => {
         if (i === 0 && pdfNotes) {
           return [r.field, r.details, { content: pdfNotes, rowSpan: table.rows.length }];
         }
         if (i > 0 && pdfNotes) {
-          return [r.field, r.details]; // notes cell is spanned from first row
+          return [r.field, r.details];
         }
         return [r.field, r.details, ''];
       });
@@ -132,6 +149,30 @@ export default function ExportPreview() {
         bodyStyles: { fontSize: 8, cellPadding: 2.5 },
         columnStyles: { 0: { cellWidth: 28, fontStyle: 'bold' }, 1: { cellWidth: 'auto' }, 2: { cellWidth: 55 } },
         styles: { overflow: 'linebreak', lineWidth: 0.2, lineColor: [200, 200, 200] },
+        didDrawCell: (data: any) => {
+          if (data.section !== 'body') return;
+          // Make Details column cells clickable
+          if (data.column.index === 1 && detailUrls[data.row.index]) {
+            doc.link(data.cell.x, data.cell.y, data.cell.width, data.cell.height, { url: detailUrls[data.row.index] });
+            // Draw text in blue to indicate it's a link
+            doc.setTextColor(30, 90, 200);
+            doc.setFontSize(8);
+            doc.text(data.cell.text.join(' '), data.cell.x + 2.5, data.cell.y + data.cell.height / 2 + 1);
+            doc.setTextColor(0, 0, 0);
+          }
+          // Make Notes/Documents column clickable per-link
+          if (data.column.index === 2 && data.row.index === 0 && linkUrls.some(u => u)) {
+            // Add link annotations for each line in the notes cell
+            const lineHeight = 3.5;
+            let cy = data.cell.y + 2.5;
+            linkUrls.forEach((url) => {
+              if (url) {
+                doc.link(data.cell.x, cy - 1.5, data.cell.width, lineHeight, { url });
+              }
+              cy += lineHeight;
+            });
+          }
+        },
       });
       y = (doc as any).lastAutoTable.finalY + 8;
     }

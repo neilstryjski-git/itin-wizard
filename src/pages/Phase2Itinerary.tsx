@@ -702,24 +702,13 @@ function parseRawInput(text: string): ItineraryEvent[] {
         date, departureLocation: location, departureTime: time,
         flightNumber, confirmationCode: confirmation, links,
       });
-    } else if (/check.?in/i.test(lower)) {
-      events.push({
-        id: crypto.randomUUID(), type: 'check-in', title: title || 'Check-in',
-        date, time: time || '15:00', location, address, confirmationCode: confirmation, links,
-      });
-    } else if (/check.?out/i.test(lower)) {
-      events.push({
-        id: crypto.randomUUID(), type: 'check-out', title: title || 'Check-out',
-        date, time: time || '11:00', location, address, confirmationCode: confirmation, links,
-      });
-    } else if (/hotel|resort|stay|airbnb|lodge|inn|hostel|villa/i.test(lower)) {
+    } else if (/check.?in|check.?out|hotel|resort|stay|airbnb|lodge|inn|hostel|villa/i.test(lower)) {
       const dates = extractDateRange(fullText);
       events.push({
         id: crypto.randomUUID(), type: 'accommodation',
         title: title || 'Accommodation',
         date: dates[0] || date, endDate: dates[1] !== dates[0] ? dates[1] : undefined,
-        time: time || '15:00',
-        location, address, confirmationCode: confirmation, links,
+        time: time || '15:00', location, address, confirmationCode: confirmation, links,
       });
     } else if (/transfer|shuttle|taxi|uber|lyft|pickup|drop.?off/i.test(lower)) {
       events.push({

@@ -145,6 +145,7 @@ export function buildTimeline(events: ItineraryEvent[]): TimelineEntry[] {
   const entries: TimelineEntry[] = [];
   for (const ev of events) {
     if (ev.type === 'accommodation') {
+      // Expand into check-in and check-out bookends
       entries.push({
         event: ev, displayType: 'check-in', displayDate: ev.date,
         displayTime: ev.time || '15:00', isBookend: 'check-in',
@@ -155,6 +156,18 @@ export function buildTimeline(events: ItineraryEvent[]): TimelineEntry[] {
           displayTime: '11:00', isBookend: 'check-out',
         });
       }
+    } else if (ev.type === 'check-in') {
+      // Legacy type — treat as accommodation check-in bookend (don't duplicate)
+      entries.push({
+        event: ev, displayType: 'check-in', displayDate: ev.date,
+        displayTime: ev.time || '15:00', isBookend: 'check-in',
+      });
+    } else if (ev.type === 'check-out') {
+      // Legacy type — treat as accommodation check-out bookend (don't duplicate)
+      entries.push({
+        event: ev, displayType: 'check-out', displayDate: ev.date,
+        displayTime: ev.time || '11:00', isBookend: 'check-out',
+      });
     } else if (ev.type === 'flight') {
       entries.push({ event: ev, displayType: 'flight', displayDate: ev.date, displayTime: ev.departureTime });
     } else {

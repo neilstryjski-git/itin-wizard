@@ -15,7 +15,7 @@ import { useProjectsContext } from '@/contexts/ProjectsContext';
 import { ItineraryEvent, TravelLink, FileAttachment } from '@/types/project';
 import { FileDropZone, AttachmentList } from '@/components/FileDropZone';
 import { supabase } from '@/integrations/supabase/client';
-import { buildTimeline } from '@/lib/itinerary-utils';
+import { buildTimeline, normalizeDate } from '@/lib/itinerary-utils';
 
 const EVENT_ICONS: Record<string, any> = {
   'flight': Plane,
@@ -110,8 +110,8 @@ export default function Phase2Itinerary() {
       id: ev.id || crypto.randomUUID(),
       type: ev.type || 'activity',
       title: ev.title || 'Untitled Event',
-      date: ev.date || new Date().toISOString().split('T')[0],
-      endDate: ev.endDate,
+      date: normalizeDate(ev.date) || new Date().toISOString().split('T')[0],
+      endDate: normalizeDate(ev.endDate) || undefined,
       time: ev.time,
       location: ev.location,
       address: ev.address,

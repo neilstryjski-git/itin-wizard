@@ -104,3 +104,50 @@ export function getEventTitle(event: ItineraryEvent): string {
   const emoji = EVENT_EMOJI[event.type] || '📍';
   return `${emoji} ${event.title}`;
 }
+
+/**
+ * Returns the effective sort key for an event.
+ * For flights, uses departureTime; for others, uses time.
+ */
+export function getEventSortKey(event: ItineraryEvent): string {
+  const time = event.type === 'flight' ? (event.departureTime || '') : (event.time || '');
+  return `${event.date}${time}`;
+}
+
+/**
+ * Expand accommodation events into check-in/check-out bookends and sort
+ * all entries chronologically for timeline display.
+ */
+export interface TimelineEntry {
+  event: ItineraryEvent;
+  displayType: string;
+  displayDate: string;
+  displayTime?: string;
+  isBookend?: 'check-in' | 'check-out';
+}
+
+export function buildTimeline(events: ItineraryEvent[]): TimelineEntry[] {
+  const entries: TimelineEntry[] = [];
+  for (const ev of events) {
+    if (ev.type === 'accommodation') {
+      entries.push({
+        event: ev, displayType: 'check-in', displayDate: ev.date,
+        displayTime: ev.time || '15:00', isBookend: 'check-in',
+      });
+      if (ev.endDate && ev.endDate !== ev.date) {
+        entries.push({
+          event: ev, displayType: 'check-out', displayDate: ev.endDate,
+          displayTime: '11:00', isBookend: 'check-out',
+        });
+      }
+    } else if (ev.type === 'flight') {
+      entries.push({ event: ev, displayType: 'flight', displayDate: ev.date, displayTime: ev.departureTime });
+    } else {
+      entries.push({ event: ev, displayType: ev.type, displayDate: ev.date, displayTime: ev.time });
+    }
+  }
+  entries.sort((a, b) =>
+    `${a.displayDate}${a.displayTime || ''}`.localeCompare(`${b.displayDate}${b.displayTime || ''}`)
+  );
+  return entries;
+}

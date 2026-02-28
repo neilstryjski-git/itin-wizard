@@ -11,7 +11,7 @@ import { useProjectsContext } from '@/contexts/ProjectsContext';
 import { ItineraryEvent, TravelLink } from '@/types/project';
 import {
   EVENT_EMOJI, EVENT_TYPE_LABELS, formatDate, formatTime,
-  buildEventRows, getEventTitle, EventRow,
+  buildEventRows, getEventTitle, EventRow, buildTimeline,
 } from '@/lib/itinerary-utils';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -29,9 +29,7 @@ export default function ExportPreview() {
 
   if (!project) { navigate('/'); return null; }
 
-  const sorted = [...project.phase_2_itinerary.events].sort(
-    (a, b) => `${a.date}${a.time || ''}`.localeCompare(`${b.date}${b.time || ''}`)
-  );
+  const timeline = buildTimeline(project.phase_2_itinerary.events);
 
   const updateEvent = (eventId: string, updates: Partial<ItineraryEvent>) => {
     updateProject(projectId!, p => ({
@@ -46,13 +44,13 @@ export default function ExportPreview() {
   };
 
   const addLink = (eventId: string, link: TravelLink) => {
-    const event = sorted.find(e => e.id === eventId);
+    const event = project.phase_2_itinerary.events.find(e => e.id === eventId);
     if (!event) return;
     updateEvent(eventId, { links: [...event.links, link] });
   };
 
   const removeLink = (eventId: string, index: number) => {
-    const event = sorted.find(e => e.id === eventId);
+    const event = project.phase_2_itinerary.events.find(e => e.id === eventId);
     if (!event) return;
     updateEvent(eventId, { links: event.links.filter((_, i) => i !== index) });
   };
@@ -103,7 +101,8 @@ export default function ExportPreview() {
     doc.line(margin, y, pageWidth - margin, y);
     y += 6;
 
-    for (const event of sorted) {
+    for (const entry of timeline) {
+      const event = entry.event;
       if (y > 250) { doc.addPage(); y = 15; }
 
       doc.setFontSize(12);
@@ -212,12 +211,13 @@ export default function ExportPreview() {
         <hr className="my-4 border-border" />
 
         {/* Events */}
-        {sorted.map(event => {
+        {timeline.map((entry, idx) => {
+          const event = entry.event;
           const rows = buildEventRows(event);
           const isEditing = editingEvent === event.id;
 
           return (
-            <div key={event.id} className="mb-6">
+            <div key={`${event.id}-${entry.isBookend || idx}`} className="mb-6">
               <div className="flex items-center justify-between mb-2">
                 <h3 className="font-bold text-base">{getEventTitle(event)}</h3>
                 <Button
@@ -353,7 +353,7 @@ export default function ExportPreview() {
           );
         })}
 
-        {sorted.length === 0 && (
+        {timeline.length === 0 && (
           <p className="text-center text-muted-foreground py-12">
             No events to preview. Add events to your itinerary first.
           </p>

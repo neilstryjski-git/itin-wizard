@@ -54,61 +54,64 @@ export function formatTime(time?: string): string {
 export interface EventRow {
   field: string;
   details: string;
-  notes: string;
 }
 
-export function buildEventRows(event: ItineraryEvent): EventRow[] {
+export interface EventTableData {
+  rows: EventRow[];
+  notes: string; // Combined notes/documents for the entire event
+}
+
+export function buildEventTable(event: ItineraryEvent): EventTableData {
   const rows: EventRow[] = [];
-  const linkNotes = event.links.length > 0 ? event.links.map(l => `• ${l.label}`).join('\n') : '';
 
   // Date
   if (event.type === 'accommodation' && event.endDate) {
-    rows.push({ field: 'Date', details: `${formatDate(event.date)} – ${formatDate(event.endDate)}`, notes: linkNotes });
+    rows.push({ field: 'Date', details: `${formatDate(event.date)} – ${formatDate(event.endDate)}` });
   } else {
-    rows.push({ field: 'Date', details: formatDate(event.date), notes: linkNotes });
+    rows.push({ field: 'Date', details: formatDate(event.date) });
   }
 
   // Flight-specific: departure and arrival
   if (event.type === 'flight') {
     const depParts = [event.departureLocation, event.departureTime ? `at ${formatTime(event.departureTime)}` : ''].filter(Boolean);
     const arrParts = [event.arrivalLocation, event.arrivalTime ? `at ${formatTime(event.arrivalTime)}` : ''].filter(Boolean);
-    if (depParts.length > 0) {
-      rows.push({ field: 'Departure', details: depParts.join(' · '), notes: '' });
-    }
-    if (arrParts.length > 0) {
-      rows.push({ field: 'Arrival', details: arrParts.join(' · '), notes: '' });
-    }
+    if (depParts.length > 0) rows.push({ field: 'Departure', details: depParts.join(' · ') });
+    if (arrParts.length > 0) rows.push({ field: 'Arrival', details: arrParts.join(' · ') });
   } else {
-    // Time for non-flight events
     if (event.time) {
-      let timeStr = '';
-      if (event.type === 'accommodation') timeStr = `Check-in after ${formatTime(event.time)}`;
-      else timeStr = formatTime(event.time);
-      rows.push({ field: 'Time', details: timeStr, notes: '' });
+      const timeStr = event.type === 'accommodation' ? `Check-in after ${formatTime(event.time)}` : formatTime(event.time);
+      rows.push({ field: 'Time', details: timeStr });
     }
   }
 
   // Location (non-flight)
   if (event.type !== 'flight' && (event.location || event.address)) {
-    rows.push({ field: 'Location', details: [event.location, event.address].filter(Boolean).join(', '), notes: '' });
+    rows.push({ field: 'Location', details: [event.location, event.address].filter(Boolean).join(', ') });
   }
 
   // Details
   if (event.notes || event.flightNumber) {
-    rows.push({ field: 'Details', details: [event.flightNumber ? `Flight ${event.flightNumber}` : '', event.notes].filter(Boolean).join('. '), notes: '' });
+    rows.push({ field: 'Details', details: [event.flightNumber ? `Flight ${event.flightNumber}` : '', event.notes].filter(Boolean).join('. ') });
   }
 
   // Confirmation
   if (event.confirmationCode) {
-    rows.push({ field: 'Confirmation', details: event.confirmationCode, notes: '' });
+    rows.push({ field: 'Confirmation', details: event.confirmationCode });
   }
 
-  // Attachments
-  if (event.attachments && event.attachments.length > 0) {
-    rows.push({ field: 'Attachments', details: event.attachments.map(a => `• ${a.name}`).join('\n'), notes: '' });
-  }
+  // Build combined notes string
+  const notesParts: string[] = [];
+  if (event.links.length > 0) notesParts.push(...event.links.map(l => `• ${l.label}`));
+  if (event.attachments && event.attachments.length > 0) notesParts.push(...event.attachments.map(a => `📎 ${a.name}`));
+  const notes = notesParts.join('\n');
 
-  return rows;
+  return { rows, notes };
+}
+
+/** @deprecated Use buildEventTable instead */
+export function buildEventRows(event: ItineraryEvent): (EventRow & { notes: string })[] {
+  const table = buildEventTable(event);
+  return table.rows.map((r, i) => ({ ...r, notes: i === 0 ? table.notes : '' }));
 }
 
 export function getEventTitle(event: ItineraryEvent): string {

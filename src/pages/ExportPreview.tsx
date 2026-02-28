@@ -11,7 +11,7 @@ import { useProjectsContext } from '@/contexts/ProjectsContext';
 import { ItineraryEvent, TravelLink } from '@/types/project';
 import {
   EVENT_EMOJI, EVENT_TYPE_LABELS, formatDate, formatTime,
-  buildEventRows, getEventTitle, EventRow, buildTimeline,
+  buildEventTable, getEventTitle, buildTimeline,
 } from '@/lib/itinerary-utils';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -110,11 +110,20 @@ export default function ExportPreview() {
       doc.text(getEventTitle(event), margin, y);
       y += 2;
 
-      const rows = buildEventRows(event);
+      const table = buildEventTable(event);
+      const bodyRows = table.rows.map((r, i) => {
+        if (i === 0 && table.notes) {
+          return [r.field, r.details, { content: table.notes, rowSpan: table.rows.length }];
+        }
+        if (i > 0 && table.notes) {
+          return [r.field, r.details]; // notes cell is spanned from first row
+        }
+        return [r.field, r.details, ''];
+      });
       autoTable(doc, {
         startY: y,
         head: [['Field', 'Details', 'Notes/Documents']],
-        body: rows.map(r => [r.field, r.details, r.notes]),
+        body: bodyRows,
         margin: { left: margin, right: margin },
         theme: 'grid',
         headStyles: { fillColor: [60, 60, 60], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
@@ -213,7 +222,7 @@ export default function ExportPreview() {
         {/* Events */}
         {timeline.map((entry, idx) => {
           const event = entry.event;
-          const rows = buildEventRows(event);
+          const table = buildEventTable(event);
           const isEditing = editingEvent === event.id;
 
           return (
@@ -240,7 +249,7 @@ export default function ExportPreview() {
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map((row, ri) => (
+                  {table.rows.map((row, ri) => (
                     <tr key={ri} className="border-b border-border last:border-b-0">
                       <td className="p-2 font-semibold text-muted-foreground align-top">{row.field}</td>
                       <td className="p-2 align-top">
@@ -276,75 +285,53 @@ export default function ExportPreview() {
                           </span>
                         )}
                       </td>
-                      <td className="p-2 align-top text-xs text-muted-foreground whitespace-pre-line">
-                        {row.notes}
-                        {/* Show links for the Date row */}
-                        {row.field === 'Date' && isEditing && (
-                          <div className="mt-1 space-y-1">
-                            {event.links.map((link, li) => (
-                              <div key={li} className="flex items-center gap-1">
-                                <a href={link.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-0.5">
+                      {/* Merged notes/documents cell — only render on first row with rowSpan */}
+                      {ri === 0 && (
+                        <td className="p-2 align-top text-xs text-muted-foreground whitespace-pre-line" rowSpan={table.rows.length}>
+                          {table.notes}
+                          {/* Links editing */}
+                          {isEditing && (
+                            <div className="mt-1 space-y-1">
+                              {event.links.map((link, li) => (
+                                <div key={li} className="flex items-center gap-1">
+                                  <a href={link.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-0.5">
+                                    <ExternalLink className="h-2.5 w-2.5" /> {link.label}
+                                  </a>
+                                  <Button variant="ghost" size="sm" className="h-5 w-5 p-0 text-destructive" onClick={() => removeLink(event.id, li)}>
+                                    <X className="h-2.5 w-2.5" />
+                                  </Button>
+                                </div>
+                              ))}
+                              {linkForm?.eventId === event.id ? (
+                                <div className="flex gap-1 mt-1">
+                                  <Input className="h-6 text-xs" placeholder="Label" value={linkForm.label} onChange={e => setLinkForm({ ...linkForm, label: e.target.value })} />
+                                  <Input className="h-6 text-xs" placeholder="https://..." value={linkForm.url} onChange={e => setLinkForm({ ...linkForm, url: e.target.value })} />
+                                  <Button size="sm" variant="ghost" className="h-6 px-1" onClick={() => { if (linkForm.label && linkForm.url) { addLink(event.id, { label: linkForm.label, url: linkForm.url }); setLinkForm(null); } }}>
+                                    <Check className="h-3 w-3" />
+                                  </Button>
+                                  <Button size="sm" variant="ghost" className="h-6 px-1" onClick={() => setLinkForm(null)}>
+                                    <X className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              ) : (
+                                <Button variant="ghost" size="sm" className="h-5 text-xs gap-0.5 mt-1 text-primary" onClick={() => setLinkForm({ eventId: event.id, label: '', url: '' })}>
+                                  <Plus className="h-2.5 w-2.5" /> Add link
+                                </Button>
+                              )}
+                            </div>
+                          )}
+                          {/* Links in non-edit mode */}
+                          {!isEditing && event.links.length > 0 && (
+                            <div className="mt-1 space-y-0.5">
+                              {event.links.map((link, li) => (
+                                <a key={li} href={link.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-0.5 text-primary hover:underline">
                                   <ExternalLink className="h-2.5 w-2.5" /> {link.label}
                                 </a>
-                                <Button variant="ghost" size="sm" className="h-5 w-5 p-0 text-destructive" onClick={() => removeLink(event.id, li)}>
-                                  <X className="h-2.5 w-2.5" />
-                                </Button>
-                              </div>
-                            ))}
-                            {linkForm?.eventId === event.id ? (
-                              <div className="flex gap-1 mt-1">
-                                <Input
-                                  className="h-6 text-xs"
-                                  placeholder="Label"
-                                  value={linkForm.label}
-                                  onChange={e => setLinkForm({ ...linkForm, label: e.target.value })}
-                                />
-                                <Input
-                                  className="h-6 text-xs"
-                                  placeholder="https://..."
-                                  value={linkForm.url}
-                                  onChange={e => setLinkForm({ ...linkForm, url: e.target.value })}
-                                />
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  className="h-6 px-1"
-                                  onClick={() => {
-                                    if (linkForm.label && linkForm.url) {
-                                      addLink(event.id, { label: linkForm.label, url: linkForm.url });
-                                      setLinkForm(null);
-                                    }
-                                  }}
-                                >
-                                  <Check className="h-3 w-3" />
-                                </Button>
-                                <Button size="sm" variant="ghost" className="h-6 px-1" onClick={() => setLinkForm(null)}>
-                                  <X className="h-3 w-3" />
-                                </Button>
-                              </div>
-                            ) : (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-5 text-xs gap-0.5 mt-1 text-primary"
-                                onClick={() => setLinkForm({ eventId: event.id, label: '', url: '' })}
-                              >
-                                <Plus className="h-2.5 w-2.5" /> Add link
-                              </Button>
-                            )}
-                          </div>
-                        )}
-                        {/* Show links in non-edit mode */}
-                        {row.field === 'Date' && !isEditing && event.links.length > 0 && (
-                          <div className="mt-1 space-y-0.5">
-                            {event.links.map((link, li) => (
-                              <a key={li} href={link.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-0.5 text-primary hover:underline">
-                                <ExternalLink className="h-2.5 w-2.5" /> {link.label}
-                              </a>
-                            ))}
-                          </div>
-                        )}
-                      </td>
+                              ))}
+                            </div>
+                          )}
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>

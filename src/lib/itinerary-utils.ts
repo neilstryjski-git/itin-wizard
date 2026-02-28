@@ -62,14 +62,25 @@ export interface EventTableData {
   noteItems: string[]; // Individual note items for HTML rendering
 }
 
-export function buildEventTable(event: ItineraryEvent): EventTableData {
+export function buildEventTable(event: ItineraryEvent, bookend?: 'check-in' | 'check-out'): EventTableData {
   const rows: EventRow[] = [];
+  const isCheckOut = bookend === 'check-out';
 
   // Date
-  if (event.type === 'accommodation' && event.endDate) {
+  if (isCheckOut) {
+    rows.push({ field: 'Date', details: formatDate(event.endDate || event.date) });
+  } else if (event.type === 'accommodation' && event.endDate) {
     rows.push({ field: 'Date', details: `${formatDate(event.date)} – ${formatDate(event.endDate)}` });
   } else {
     rows.push({ field: 'Date', details: formatDate(event.date) });
+  }
+
+  // For check-out bookends, only show time — skip location, details, confirmation
+  if (isCheckOut) {
+    rows.push({ field: 'Time', details: `Check-out by 11:00 AM` });
+    const noteItems: string[] = [];
+    const notes = noteItems.map(n => `• ${n}`).join('\n');
+    return { rows, notes, noteItems };
   }
 
   // Flight-specific: departure and arrival

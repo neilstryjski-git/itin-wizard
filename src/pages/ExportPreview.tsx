@@ -223,7 +223,7 @@ export default function ExportPreview() {
         {/* Events */}
         {timeline.map((entry, idx) => {
           const event = entry.event;
-          const table = buildEventTable(event);
+          const table = buildEventTable(event, entry.isBookend);
           const isEditing = editingEvent === event.id;
 
           return (

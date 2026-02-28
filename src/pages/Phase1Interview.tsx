@@ -1,46 +1,62 @@
 import { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Send, Bot, User, CheckCircle2 } from 'lucide-react';
+import { Send, Bot, User, CheckCircle2, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Card } from '@/components/ui/card';
 import { useProjectsContext } from '@/contexts/ProjectsContext';
 import { ChatMessage, RequirementItem } from '@/types/project';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
-const INTERVIEW_STEPS = [
-  { key: 'name', question: "What would you like to name this trip?", placeholder: "e.g., Belize Family Adventure 2026" },
-  { key: 'destination', question: "What's your destination?", placeholder: "e.g., Belize, Mexico, Japan" },
-  { key: 'travelers', question: "Who's traveling? List names, marking minors with (minor). Example: John, Sarah (minor)", placeholder: "e.g., Alice, Bob (minor), Charlie" },
-  { key: 'transit', question: "Will you be transiting through the USA? (yes/no)", placeholder: "yes or no" },
-  { key: 'dates', question: "What are your approximate travel dates? (start - end)", placeholder: "e.g., March 15 - March 22, 2026" },
-];
+const WELCOME_MSG = `Welcome! Tell me about your trip — where you're going, who's traveling, your dates, anything you know so far. I'll figure out the rest!`;
+
+interface ExtractedData {
+  tripName?: string;
+  destination?: string;
+  travelers?: { name: string; isMinor: boolean }[];
+  transitViaUSA?: boolean;
+  startDate?: string;
+  endDate?: string;
+}
 
 export default function Phase1Interview() {
   const { projectId } = useParams<{ projectId: string }>();
   const { getProject, updateProject } = useProjectsContext();
   const navigate = useNavigate();
+  const { toast } = useToast();
   const project = getProject(projectId!);
   const [input, setInput] = useState('');
-  const [step, setStep] = useState(0);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isCompleted, setIsCompleted] = useState(false);
+  const [accumulated, setAccumulated] = useState<ExtractedData>({});
   const scrollRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     if (!project) return;
     if (project.phase_1_requirements.completed) {
       setMessages(project.phase_1_requirements.chatHistory);
-      setStep(INTERVIEW_STEPS.length);
+      setIsCompleted(true);
+      // Rebuild accumulated from metadata
+      setAccumulated({
+        tripName: project.metadata.name,
+        destination: project.metadata.destination,
+        travelers: project.metadata.travelers,
+        transitViaUSA: project.metadata.transitViaUSA,
+        startDate: project.metadata.startDate,
+        endDate: project.metadata.endDate,
+      });
       return;
     }
     if (project.phase_1_requirements.chatHistory.length > 0) {
       setMessages(project.phase_1_requirements.chatHistory);
-      setStep(Math.floor(project.phase_1_requirements.chatHistory.length / 2));
     } else {
       const first: ChatMessage = {
         id: crypto.randomUUID(),
         role: 'assistant',
-        text: `Welcome! Let's plan your trip. ${INTERVIEW_STEPS[0].question}`,
+        text: WELCOME_MSG,
       };
       setMessages([first]);
     }
@@ -55,94 +71,114 @@ export default function Phase1Interview() {
     return null;
   }
 
-  const handleSend = () => {
-    if (!input.trim() || step >= INTERVIEW_STEPS.length) return;
+  const handleSend = async () => {
+    if (!input.trim() || isAnalyzing || isCompleted) return;
 
     const userMsg: ChatMessage = { id: crypto.randomUUID(), role: 'user', text: input.trim() };
     const newMessages = [...messages, userMsg];
-    const currentStep = INTERVIEW_STEPS[step];
+    setMessages(newMessages);
+    setInput('');
+    setIsAnalyzing(true);
 
-    // Process answer
-    updateProject(projectId!, p => {
-      const updated = { ...p };
-      const md = { ...updated.metadata };
+    try {
+      // Build conversation for AI — only user/assistant content messages
+      const aiMessages = newMessages
+        .map(m => ({ role: m.role, content: m.text }));
 
-      switch (currentStep.key) {
-        case 'name':
-          md.name = input.trim();
-          break;
-        case 'destination':
-          md.destination = input.trim();
-          break;
-        case 'travelers':
-          md.travelers = input.split(',').map(t => {
-            const trimmed = t.trim();
-            const isMinor = /\(minor\)/i.test(trimmed);
-            return { name: trimmed.replace(/\s*\(minor\)\s*/i, ''), isMinor };
-          });
-          break;
-        case 'transit':
-          md.transitViaUSA = /^y/i.test(input.trim());
-          break;
-        case 'dates': {
-          const parts = input.split('-').map(s => s.trim());
-          if (parts.length >= 2) {
-            md.startDate = parts[0];
-            md.endDate = parts[1];
-          }
-          break;
-        }
-      }
+      const { data, error } = await supabase.functions.invoke('analyze-interview', {
+        body: { messages: aiMessages },
+      });
 
-      updated.metadata = md;
-      updated.phase_1_requirements.chatHistory = newMessages;
-      return updated;
-    });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
 
-    const nextStep = step + 1;
+      const { extracted, missingFields, followUpMessage, allComplete } = data;
 
-    if (nextStep < INTERVIEW_STEPS.length) {
+      // Merge extracted data with accumulated
+      const merged = { ...accumulated };
+      if (extracted.tripName) merged.tripName = extracted.tripName;
+      if (extracted.destination) merged.destination = extracted.destination;
+      if (extracted.travelers?.length) merged.travelers = extracted.travelers;
+      if (extracted.transitViaUSA !== undefined && extracted.transitViaUSA !== null) merged.transitViaUSA = extracted.transitViaUSA;
+      if (extracted.startDate) merged.startDate = extracted.startDate;
+      if (extracted.endDate) merged.endDate = extracted.endDate;
+      setAccumulated(merged);
+
+      // Update project metadata with what we have so far
+      updateProject(projectId!, p => {
+        const md = { ...p.metadata };
+        if (merged.tripName) md.name = merged.tripName;
+        if (merged.destination) md.destination = merged.destination;
+        if (merged.travelers?.length) md.travelers = merged.travelers;
+        if (merged.transitViaUSA !== undefined) md.transitViaUSA = merged.transitViaUSA;
+        if (merged.startDate) md.startDate = merged.startDate;
+        if (merged.endDate) md.endDate = merged.endDate;
+        return { ...p, metadata: md };
+      });
+
       const botMsg: ChatMessage = {
         id: crypto.randomUUID(),
         role: 'assistant',
-        text: `Got it! ${INTERVIEW_STEPS[nextStep].question}`,
+        text: followUpMessage,
       };
-      newMessages.push(botMsg);
-    } else {
-      // Generate checklist
-      const checklist = generateChecklist(project, input, step);
-      const summaryMsg: ChatMessage = {
+      const updatedMessages = [...newMessages, botMsg];
+      setMessages(updatedMessages);
+
+      if (allComplete) {
+        const checklist = generateChecklist(merged);
+        setIsCompleted(true);
+        updateProject(projectId!, p => ({
+          ...p,
+          phase_1_requirements: {
+            ...p.phase_1_requirements,
+            completed: true,
+            chatHistory: updatedMessages,
+            checklist,
+          },
+        }));
+      } else {
+        // Save chat history
+        updateProject(projectId!, p => ({
+          ...p,
+          phase_1_requirements: {
+            ...p.phase_1_requirements,
+            chatHistory: updatedMessages,
+          },
+        }));
+      }
+    } catch (e: any) {
+      console.error('Interview analysis error:', e);
+      toast({
+        title: 'Analysis failed',
+        description: e.message || 'Please try again.',
+        variant: 'destructive',
+      });
+      // Add error message to chat
+      const errMsg: ChatMessage = {
         id: crypto.randomUUID(),
         role: 'assistant',
-        text: `Excellent! I've compiled your requirements checklist. You can view it below and proceed to building your itinerary.`,
+        text: "Sorry, I had trouble analyzing that. Could you try again?",
       };
-      newMessages.push(summaryMsg);
-
-      updateProject(projectId!, p => ({
-        ...p,
-        phase_1_requirements: {
-          ...p.phase_1_requirements,
-          completed: true,
-          chatHistory: newMessages,
-          checklist,
-        },
-      }));
+      setMessages([...newMessages, errMsg]);
+    } finally {
+      setIsAnalyzing(false);
+      setTimeout(() => textareaRef.current?.focus(), 50);
     }
-
-    setMessages(newMessages);
-    setStep(nextStep);
-    setInput('');
-    setTimeout(() => inputRef.current?.focus(), 50);
   };
 
-  const isCompleted = step >= INTERVIEW_STEPS.length;
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
 
   return (
     <div className="flex flex-col h-[calc(100vh-3.5rem)]">
       <div className="p-4 border-b bg-card">
         <h2 className="font-heading text-xl font-semibold">Travel Interview</h2>
         <p className="text-sm text-muted-foreground">
-          {isCompleted ? 'Interview complete' : `Step ${step + 1} of ${INTERVIEW_STEPS.length}`}
+          {isCompleted ? 'Interview complete' : 'Tell me about your trip — I\'ll ask only what I need'}
         </p>
       </div>
 
@@ -154,7 +190,7 @@ export default function Phase1Interview() {
                 <Bot className="h-4 w-4 text-primary-foreground" />
               </div>
             )}
-            <Card className={`max-w-md p-3 text-sm ${
+            <Card className={`max-w-md p-3 text-sm whitespace-pre-wrap ${
               msg.role === 'user'
                 ? 'bg-primary text-primary-foreground'
                 : 'bg-card'
@@ -168,6 +204,18 @@ export default function Phase1Interview() {
             )}
           </div>
         ))}
+
+        {isAnalyzing && (
+          <div className="flex gap-3 fade-in">
+            <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center shrink-0">
+              <Bot className="h-4 w-4 text-primary-foreground" />
+            </div>
+            <Card className="max-w-md p-3 text-sm bg-card flex items-center gap-2">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Analyzing your details...
+            </Card>
+          </div>
+        )}
 
         {isCompleted && project.phase_1_requirements.checklist.length > 0 && (
           <div className="fade-in mt-6">
@@ -224,16 +272,19 @@ export default function Phase1Interview() {
       {!isCompleted && (
         <div className="p-4 border-t bg-card">
           <form onSubmit={e => { e.preventDefault(); handleSend(); }} className="flex gap-2">
-            <Input
-              ref={inputRef}
+            <Textarea
+              ref={textareaRef}
               value={input}
               onChange={e => setInput(e.target.value)}
-              placeholder={INTERVIEW_STEPS[step]?.placeholder}
-              className="flex-1"
+              onKeyDown={handleKeyDown}
+              placeholder="Tell me about your trip... (Shift+Enter for new line)"
+              className="flex-1 min-h-[44px] max-h-[120px] resize-none"
+              rows={1}
+              disabled={isAnalyzing}
               autoFocus
             />
-            <Button type="submit" size="icon">
-              <Send className="h-4 w-4" />
+            <Button type="submit" size="icon" disabled={isAnalyzing || !input.trim()}>
+              {isAnalyzing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
             </Button>
           </form>
         </div>
@@ -242,17 +293,11 @@ export default function Phase1Interview() {
   );
 }
 
-function generateChecklist(project: any, lastInput: string, currentStep: number): RequirementItem[] {
+function generateChecklist(data: ExtractedData): RequirementItem[] {
   const items: RequirementItem[] = [];
   const id = () => crypto.randomUUID();
 
-  // Get latest metadata (built up from steps already processed)
-  const md = project.metadata;
-  // Parse transit from last input since it might be the transit step
-  const transitUSA = currentStep === 3 ? /^y/i.test(lastInput.trim()) : md.transitViaUSA;
-
-  // Determine destination - might come from step index 1
-  const dest = md.destination?.toLowerCase() || '';
+  const dest = data.destination?.toLowerCase() || '';
 
   items.push({ id: id(), title: 'Valid passports for all travelers', checked: false });
   items.push({ id: id(), title: 'Travel insurance purchased', checked: false });
@@ -270,8 +315,8 @@ function generateChecklist(project: any, lastInput: string, currentStep: number)
     });
   }
 
-  const hasMinors = md.travelers?.some((t: any) => t.isMinor) || false;
-  if (hasMinors && transitUSA) {
+  const hasMinors = data.travelers?.some(t => t.isMinor) || false;
+  if (hasMinors && data.transitViaUSA) {
     items.push({
       id: id(),
       title: 'Notarized Consent Letters for minor travelers (required for USA transit)',
@@ -280,7 +325,7 @@ function generateChecklist(project: any, lastInput: string, currentStep: number)
     });
   }
 
-  if (transitUSA) {
+  if (data.transitViaUSA) {
     items.push({
       id: id(),
       title: 'ESTA authorization for USA transit',

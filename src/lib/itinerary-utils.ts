@@ -102,7 +102,7 @@ export function buildEventTable(event: ItineraryEvent): EventTableData {
 
   // Build combined notes
   const noteItems: string[] = [];
-  if (event.links.length > 0) noteItems.push(...event.links.map(l => l.label));
+  if (event.links.length > 0) noteItems.push(...event.links.map(l => l.url ? `🔗 ${l.label}` : l.label));
   if (event.attachments && event.attachments.length > 0) noteItems.push(...event.attachments.map(a => `📎 ${a.name}`));
   const notes = noteItems.map(n => `• ${n}`).join('\n');
 

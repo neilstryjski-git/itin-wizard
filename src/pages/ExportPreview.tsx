@@ -24,7 +24,7 @@ export default function ExportPreview() {
   const project = getProject(projectId!);
 
   const [editingEvent, setEditingEvent] = useState<string | null>(null);
-  const [linkForm, setLinkForm] = useState<{ eventId: string; label: string; url: string } | null>(null);
+  const [linkForm, setLinkForm] = useState<{ eventId: string; label: string; url: string; mode: 'link' | 'note' } | null>(null);
   const [notesEdit, setNotesEdit] = useState<{ eventId: string; field: string; value: string } | null>(null);
 
   if (!project) { navigate('/'); return null; }
@@ -288,52 +288,69 @@ export default function ExportPreview() {
                       {/* Merged notes/documents cell — only render on first row with rowSpan */}
                       {ri === 0 && (
                         <td className="p-2 align-top text-xs text-muted-foreground" rowSpan={table.rows.length}>
-                          {table.noteItems.length > 0 && !isEditing && (
-                            <ul className="list-disc list-inside space-y-1 mb-1">
-                              {table.noteItems.map((item, ni) => (
-                                <li key={ni}>{item}</li>
+                          {/* Display mode */}
+                          {!isEditing && event.links.length > 0 && (
+                            <ul className="list-disc list-inside space-y-1">
+                              {event.links.map((link, li) => (
+                                <li key={li}>
+                                  {link.url ? (
+                                    <a href={link.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline inline-flex items-center gap-0.5">
+                                      <ExternalLink className="h-2.5 w-2.5 inline shrink-0" /> {link.label}
+                                    </a>
+                                  ) : (
+                                    <span>{link.label}</span>
+                                  )}
+                                </li>
                               ))}
                             </ul>
                           )}
-                          {/* Links editing */}
+                          {/* Edit mode */}
                           {isEditing && (
-                            <div className="mt-1 space-y-1">
+                            <div className="space-y-1">
                               {event.links.map((link, li) => (
                                 <div key={li} className="flex items-center gap-1">
-                                  <a href={link.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-0.5">
-                                    <ExternalLink className="h-2.5 w-2.5" /> {link.label}
-                                  </a>
-                                  <Button variant="ghost" size="sm" className="h-5 w-5 p-0 text-destructive" onClick={() => removeLink(event.id, li)}>
+                                  {link.url ? (
+                                    <a href={link.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-0.5 truncate">
+                                      <ExternalLink className="h-2.5 w-2.5 shrink-0" /> {link.label}
+                                    </a>
+                                  ) : (
+                                    <span className="truncate">📝 {link.label}</span>
+                                  )}
+                                  <Button variant="ghost" size="sm" className="h-5 w-5 p-0 text-destructive shrink-0" onClick={() => removeLink(event.id, li)}>
                                     <X className="h-2.5 w-2.5" />
                                   </Button>
                                 </div>
                               ))}
                               {linkForm?.eventId === event.id ? (
-                                <div className="flex gap-1 mt-1">
-                                  <Input className="h-6 text-xs" placeholder="Label" value={linkForm.label} onChange={e => setLinkForm({ ...linkForm, label: e.target.value })} />
-                                  <Input className="h-6 text-xs" placeholder="https://..." value={linkForm.url} onChange={e => setLinkForm({ ...linkForm, url: e.target.value })} />
-                                  <Button size="sm" variant="ghost" className="h-6 px-1" onClick={() => { if (linkForm.label && linkForm.url) { addLink(event.id, { label: linkForm.label, url: linkForm.url }); setLinkForm(null); } }}>
-                                    <Check className="h-3 w-3" />
-                                  </Button>
-                                  <Button size="sm" variant="ghost" className="h-6 px-1" onClick={() => setLinkForm(null)}>
-                                    <X className="h-3 w-3" />
-                                  </Button>
+                                <div className="space-y-1 mt-1">
+                                  <Input className="h-6 text-xs" placeholder={linkForm.mode === 'link' ? 'Label' : 'Note text'} value={linkForm.label} onChange={e => setLinkForm({ ...linkForm, label: e.target.value })} />
+                                  {linkForm.mode === 'link' && (
+                                    <Input className="h-6 text-xs" placeholder="https://..." value={linkForm.url} onChange={e => setLinkForm({ ...linkForm, url: e.target.value })} />
+                                  )}
+                                  <div className="flex gap-1">
+                                    <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={() => {
+                                      if (linkForm.label) {
+                                        addLink(event.id, linkForm.mode === 'link' ? { label: linkForm.label, url: linkForm.url } : { label: linkForm.label });
+                                        setLinkForm(null);
+                                      }
+                                    }}>
+                                      <Check className="h-3 w-3 mr-0.5" /> Save
+                                    </Button>
+                                    <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={() => setLinkForm(null)}>
+                                      Cancel
+                                    </Button>
+                                  </div>
                                 </div>
                               ) : (
-                                <Button variant="ghost" size="sm" className="h-5 text-xs gap-0.5 mt-1 text-primary" onClick={() => setLinkForm({ eventId: event.id, label: '', url: '' })}>
-                                  <Plus className="h-2.5 w-2.5" /> Add link
-                                </Button>
+                                <div className="flex gap-1 mt-1">
+                                  <Button variant="ghost" size="sm" className="h-5 text-xs gap-0.5 text-primary" onClick={() => setLinkForm({ eventId: event.id, label: '', url: '', mode: 'link' })}>
+                                    <LinkIcon className="h-2.5 w-2.5" /> Add link
+                                  </Button>
+                                  <Button variant="ghost" size="sm" className="h-5 text-xs gap-0.5" onClick={() => setLinkForm({ eventId: event.id, label: '', url: '', mode: 'note' })}>
+                                    <Plus className="h-2.5 w-2.5" /> Add note
+                                  </Button>
+                                </div>
                               )}
-                            </div>
-                          )}
-                          {/* Links in non-edit mode */}
-                          {!isEditing && event.links.length > 0 && (
-                            <div className="mt-1 space-y-0.5">
-                              {event.links.map((link, li) => (
-                                <a key={li} href={link.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-0.5 text-primary hover:underline">
-                                  <ExternalLink className="h-2.5 w-2.5" /> {link.label}
-                                </a>
-                              ))}
                             </div>
                           )}
                         </td>

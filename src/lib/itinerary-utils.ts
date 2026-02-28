@@ -58,7 +58,8 @@ export interface EventRow {
 
 export interface EventTableData {
   rows: EventRow[];
-  notes: string; // Combined notes/documents for the entire event
+  notes: string; // Combined notes string for PDF
+  noteItems: string[]; // Individual note items for HTML rendering
 }
 
 export function buildEventTable(event: ItineraryEvent): EventTableData {
@@ -99,13 +100,13 @@ export function buildEventTable(event: ItineraryEvent): EventTableData {
     rows.push({ field: 'Confirmation', details: event.confirmationCode });
   }
 
-  // Build combined notes string
-  const notesParts: string[] = [];
-  if (event.links.length > 0) notesParts.push(...event.links.map(l => `• ${l.label}`));
-  if (event.attachments && event.attachments.length > 0) notesParts.push(...event.attachments.map(a => `📎 ${a.name}`));
-  const notes = notesParts.join('\n');
+  // Build combined notes
+  const noteItems: string[] = [];
+  if (event.links.length > 0) noteItems.push(...event.links.map(l => l.label));
+  if (event.attachments && event.attachments.length > 0) noteItems.push(...event.attachments.map(a => `📎 ${a.name}`));
+  const notes = noteItems.map(n => `• ${n}`).join('\n');
 
-  return { rows, notes };
+  return { rows, notes, noteItems };
 }
 
 /** @deprecated Use buildEventTable instead */

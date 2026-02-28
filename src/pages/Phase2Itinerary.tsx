@@ -18,6 +18,7 @@ const EVENT_ICONS: Record<string, any> = {
   'flight-arrival': Plane,
   'check-in': Hotel,
   'check-out': Hotel,
+  'accommodation': Hotel,
   'activity': MapPin,
   'transfer': ArrowRight,
 };
@@ -27,6 +28,7 @@ const EVENT_LABELS: Record<string, string> = {
   'flight-arrival': 'Flight Arrival',
   'check-in': 'Check-In',
   'check-out': 'Check-Out',
+  'accommodation': 'Accommodation',
   'activity': 'Activity',
   'transfer': 'Transfer',
 };
@@ -42,8 +44,28 @@ export default function Phase2Itinerary() {
 
   if (!project) { navigate('/'); return null; }
 
-  const events = [...project.phase_2_itinerary.events].sort(
-    (a, b) => `${a.date}${a.time || ''}`.localeCompare(`${b.date}${b.time || ''}`)
+  // Expand accommodation events into check-in / check-out bookends for display
+  type TimelineEntry = { event: ItineraryEvent; displayType: string; displayDate: string; displayTime?: string; isBookend?: 'check-in' | 'check-out' };
+
+  const timelineEntries: TimelineEntry[] = [];
+  for (const ev of project.phase_2_itinerary.events) {
+    if (ev.type === 'accommodation') {
+      timelineEntries.push({
+        event: ev, displayType: 'check-in', displayDate: ev.date,
+        displayTime: ev.time || '15:00', isBookend: 'check-in',
+      });
+      if (ev.endDate && ev.endDate !== ev.date) {
+        timelineEntries.push({
+          event: ev, displayType: 'check-out', displayDate: ev.endDate,
+          displayTime: '11:00', isBookend: 'check-out',
+        });
+      }
+    } else {
+      timelineEntries.push({ event: ev, displayType: ev.type, displayDate: ev.date, displayTime: ev.time });
+    }
+  }
+  timelineEntries.sort((a, b) =>
+    `${a.displayDate}${a.displayTime || ''}`.localeCompare(`${b.displayDate}${b.displayTime || ''}`)
   );
 
   const parseAndAdd = () => {
@@ -177,20 +199,22 @@ export default function Phase2Itinerary() {
 
       {/* Timeline */}
       <div className="space-y-3">
-        {events.length === 0 ? (
+        {timelineEntries.length === 0 ? (
           <p className="text-center text-muted-foreground py-12">
             No events yet. Paste reservation data above or add events manually.
           </p>
         ) : (
-          events.map((event, i) => {
-            const Icon = EVENT_ICONS[event.type] || MapPin;
+          timelineEntries.map((entry, i) => {
+            const { event, displayType, displayDate, displayTime, isBookend } = entry;
+            const Icon = EVENT_ICONS[displayType] || MapPin;
             const isEditing = editingId === event.id;
             const missing = hasMissing(event);
+            const bookendLabel = isBookend === 'check-in' ? 'Check-In' : isBookend === 'check-out' ? 'Check-Out' : EVENT_LABELS[event.type];
 
             return (
-              <Card key={event.id} className="relative slide-up" style={{ animationDelay: `${i * 40}ms` }}>
+              <Card key={`${event.id}-${isBookend || ''}`} className="relative slide-up" style={{ animationDelay: `${i * 40}ms` }}>
                 <CardContent className="p-4">
-                  {isEditing ? (
+                  {isEditing && !isBookend ? (
                     <EditForm
                       form={editForm}
                       setForm={setEditForm}
@@ -200,8 +224,8 @@ export default function Phase2Itinerary() {
                   ) : (
                     <div className="flex gap-3">
                       <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${
-                        event.type.includes('flight') ? 'bg-primary/10 text-primary' :
-                        event.type.includes('check') ? 'bg-accent text-accent-foreground' :
+                        displayType.includes('flight') ? 'bg-primary/10 text-primary' :
+                        displayType.includes('check') || displayType === 'accommodation' ? 'bg-accent text-accent-foreground' :
                         'bg-secondary text-secondary-foreground'
                       }`}>
                         <Icon className="h-5 w-5" />
@@ -209,16 +233,19 @@ export default function Phase2Itinerary() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                            {EVENT_LABELS[event.type]}
+                            {bookendLabel}
                           </span>
+                          {isBookend && (
+                            <span className="text-xs text-muted-foreground/60 italic">({event.title})</span>
+                          )}
                           {missing && (
                             <AlertTriangle className="h-3.5 w-3.5 text-warning" />
                           )}
                         </div>
-                        <h4 className="font-semibold">{event.title}</h4>
+                        {!isBookend && <h4 className="font-semibold">{event.title}</h4>}
                         <div className="flex flex-wrap gap-3 mt-1 text-sm text-muted-foreground">
                           <span className="flex items-center gap-1">
-                            <Clock className="h-3 w-3" /> {event.date}{event.time ? ` · ${event.time}` : ''}
+                            <Clock className="h-3 w-3" /> {displayDate}{displayTime ? ` · ${displayTime}` : ''}
                           </span>
                           {event.location && (
                             <span className="flex items-center gap-1">
@@ -326,11 +353,17 @@ function EditForm({
           <Input value={form.title || ''} onChange={e => setForm({ ...form, title: e.target.value })} />
         </div>
       </div>
-      <div className="grid grid-cols-3 gap-3">
+      <div className={`grid gap-3 ${form.type === 'accommodation' ? 'grid-cols-4' : 'grid-cols-3'}`}>
         <div>
-          <label className="text-xs font-medium text-muted-foreground">Date</label>
+          <label className="text-xs font-medium text-muted-foreground">{form.type === 'accommodation' ? 'Check-in Date' : 'Date'}</label>
           <Input type="date" value={form.date || ''} onChange={e => setForm({ ...form, date: e.target.value })} />
         </div>
+        {form.type === 'accommodation' && (
+          <div>
+            <label className="text-xs font-medium text-muted-foreground">Check-out Date</label>
+            <Input type="date" value={form.endDate || ''} onChange={e => setForm({ ...form, endDate: e.target.value })} />
+          </div>
+        )}
         <div>
           <label className="text-xs font-medium text-muted-foreground">Time</label>
           <Input type="time" value={form.time || ''} onChange={e => setForm({ ...form, time: e.target.value })} />
@@ -438,16 +471,11 @@ function parseRawInput(text: string): ItineraryEvent[] {
     } else if (/hotel|resort|stay|airbnb|lodge|inn|hostel|villa/i.test(lower)) {
       const dates = extractDateRange(fullText);
       events.push({
-        id: crypto.randomUUID(), type: 'check-in',
-        title: `Check-in: ${title || 'Accommodation'}`,
-        date: dates[0] || date, time: time || '15:00',
+        id: crypto.randomUUID(), type: 'accommodation',
+        title: title || 'Accommodation',
+        date: dates[0] || date, endDate: dates[1] !== dates[0] ? dates[1] : undefined,
+        time: time || '15:00',
         location, address, confirmationCode: confirmation, links,
-      });
-      events.push({
-        id: crypto.randomUUID(), type: 'check-out',
-        title: `Check-out: ${title || 'Accommodation'}`,
-        date: dates[1] || date, time: '11:00',
-        location, address, links: [],
       });
     } else if (/transfer|shuttle|taxi|uber|lyft|pickup|drop.?off/i.test(lower)) {
       events.push({

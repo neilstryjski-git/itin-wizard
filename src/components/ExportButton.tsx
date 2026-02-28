@@ -7,7 +7,7 @@ export function ExportButton({ projectId }: { projectId: string }) {
 
   return (
     <Button variant="outline" size="sm" onClick={() => navigate(`/project/${projectId}/export`)} className="gap-1">
-      <Download className="h-3 w-3" /> Export PDF
+      <Download className="h-3 w-3" /> Review PDF
     </Button>
   );
 }

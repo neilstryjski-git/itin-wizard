@@ -218,6 +218,7 @@ export function getEventSortKey(event: ItineraryEvent): string {
  * all entries chronologically for timeline display.
  */
 export interface TimelineEntry {
+  entryId: string;
   event: ItineraryEvent;
   displayType: string;
   displayDate: string;
@@ -234,29 +235,29 @@ export function buildTimeline(events: ItineraryEvent[], options?: { preserveOrde
 
     if (ev.type === 'accommodation') {
       entries.push({
-        event: ev, displayType: 'check-in', displayDate: normDate,
+        entryId: `${ev.id}::check-in`, event: ev, displayType: 'check-in', displayDate: normDate,
         displayTime: ev.time || '15:00', isBookend: 'check-in',
       });
       if (normEndDate && normEndDate !== normDate) {
         entries.push({
-          event: ev, displayType: 'check-out', displayDate: normEndDate,
+          entryId: `${ev.id}::check-out`, event: ev, displayType: 'check-out', displayDate: normEndDate,
           displayTime: '11:00', isBookend: 'check-out',
         });
       }
     } else if (ev.type === 'check-in') {
       entries.push({
-        event: ev, displayType: 'check-in', displayDate: normDate,
+        entryId: ev.id, event: ev, displayType: 'check-in', displayDate: normDate,
         displayTime: ev.time || '15:00', isBookend: 'check-in',
       });
     } else if (ev.type === 'check-out') {
       entries.push({
-        event: ev, displayType: 'check-out', displayDate: normDate,
+        entryId: ev.id, event: ev, displayType: 'check-out', displayDate: normDate,
         displayTime: ev.time || '11:00', isBookend: 'check-out',
       });
     } else if (ev.type === 'flight') {
-      entries.push({ event: ev, displayType: 'flight', displayDate: normDate, displayTime: ev.departureTime });
+      entries.push({ entryId: ev.id, event: ev, displayType: 'flight', displayDate: normDate, displayTime: ev.departureTime });
     } else {
-      entries.push({ event: ev, displayType: ev.type, displayDate: normDate, displayTime: ev.time });
+      entries.push({ entryId: ev.id, event: ev, displayType: ev.type, displayDate: normDate, displayTime: ev.time });
     }
   }
 
@@ -285,4 +286,21 @@ export function buildTimeline(events: ItineraryEvent[], options?: { preserveOrde
   });
 
   return entries;
+}
+
+/**
+ * Given a reordered timeline (by entryId), reconstruct the deduplicated
+ * events array preserving the new visual order.
+ * Accommodation events appear at the position of their first entry (check-in or check-out).
+ */
+export function eventsFromTimeline(entries: TimelineEntry[]): ItineraryEvent[] {
+  const seen = new Set<string>();
+  const result: ItineraryEvent[] = [];
+  for (const entry of entries) {
+    if (!seen.has(entry.event.id)) {
+      seen.add(entry.event.id);
+      result.push(entry.event);
+    }
+  }
+  return result;
 }

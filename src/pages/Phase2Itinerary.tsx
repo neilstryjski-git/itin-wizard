@@ -15,7 +15,7 @@ import { useProjectsContext } from '@/contexts/ProjectsContext';
 import { ItineraryEvent, TravelLink, FileAttachment } from '@/types/project';
 import { FileDropZone, AttachmentList } from '@/components/FileDropZone';
 import { supabase } from '@/integrations/supabase/client';
-import { buildTimeline, normalizeDate } from '@/lib/itinerary-utils';
+import { buildTimeline, normalizeDate, eventsFromTimeline, TimelineEntry } from '@/lib/itinerary-utils';
 import { SortableList, SortableItem, arrayMove } from '@/components/SortableEventList';
 
 const EVENT_ICONS: Record<string, any> = {
@@ -100,14 +100,18 @@ export default function Phase2Itinerary() {
     }
   }, [uploadedDocs, rawInput]);
 
-  const reorderEvents = useCallback((oldIndex: number, newIndex: number) => {
-    updateProject(projectId!, p => ({
-      ...p,
-      phase_2_itinerary: {
-        ...p.phase_2_itinerary,
-        events: arrayMove([...p.phase_2_itinerary.events], oldIndex, newIndex),
-      },
-    }));
+  const reorderEntries = useCallback((oldIndex: number, newIndex: number) => {
+    updateProject(projectId!, p => {
+      const timeline = buildTimeline(p.phase_2_itinerary.events, { preserveOrder: true });
+      const reordered = arrayMove([...timeline], oldIndex, newIndex);
+      return {
+        ...p,
+        phase_2_itinerary: {
+          ...p.phase_2_itinerary,
+          events: eventsFromTimeline(reordered),
+        },
+      };
+    });
   }, [projectId, updateProject]);
 
   if (!project) { navigate('/'); return null; }
@@ -418,8 +422,8 @@ export default function Phase2Itinerary() {
           </p>
         ) : (
           <SortableList
-            items={project.phase_2_itinerary.events.map(e => e.id)}
-            onReorder={reorderEvents}
+            items={timelineEntries.map(e => e.entryId)}
+            onReorder={reorderEntries}
           >
             {timelineEntries.map((entry, i) => {
               const { event, displayType, displayDate, displayTime, isBookend } = entry;
@@ -427,7 +431,7 @@ export default function Phase2Itinerary() {
               const isEditing = editingId === event.id;
               const missing = hasMissing(event);
               const bookendLabel = isBookend === 'check-in' ? 'Check-In' : isBookend === 'check-out' ? 'Check-Out' : EVENT_LABELS[event.type];
-              const isDraggable = !isBookend || isBookend === 'check-in';
+              const isDraggable = true;
 
               const cardContent = (
                 <Card className="relative slide-up" style={{ animationDelay: `${i * 40}ms` }}>
@@ -544,12 +548,12 @@ export default function Phase2Itinerary() {
 
               if (isDraggable) {
                 return (
-                  <SortableItem key={`${event.id}-${isBookend || ''}`} id={event.id}>
+                  <SortableItem key={entry.entryId} id={entry.entryId}>
                     {cardContent}
                   </SortableItem>
                 );
               }
-              return <div key={`${event.id}-${isBookend || ''}`} className="ml-5">{cardContent}</div>;
+              return <div key={entry.entryId} className="ml-5">{cardContent}</div>;
             })}
           </SortableList>
         )}

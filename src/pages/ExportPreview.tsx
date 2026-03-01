@@ -11,7 +11,7 @@ import { useProjectsContext } from '@/contexts/ProjectsContext';
 import { ItineraryEvent, TravelLink } from '@/types/project';
 import {
   EVENT_EMOJI, EVENT_TYPE_LABELS, formatDate, formatTime,
-  buildEventTable, getEventTitle, getEventTitlePdf, stripEmoji, buildTimeline, googleMapsUrl,
+  buildEventTable, getEventTitle, getEventTitlePdf, stripEmoji, buildTimeline, googleMapsUrl, eventsFromTimeline,
 } from '@/lib/itinerary-utils';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -29,14 +29,18 @@ export default function ExportPreview() {
   const [notesEdit, setNotesEdit] = useState<{ eventId: string; field: string; value: string } | null>(null);
   const [fieldLinkEdit, setFieldLinkEdit] = useState<{ eventId: string; field: string; url: string } | null>(null);
 
-  const reorderEvents = useCallback((oldIndex: number, newIndex: number) => {
-    updateProject(projectId!, p => ({
-      ...p,
-      phase_2_itinerary: {
-        ...p.phase_2_itinerary,
-        events: arrayMove([...p.phase_2_itinerary.events], oldIndex, newIndex),
-      },
-    }));
+  const reorderEntries = useCallback((oldIndex: number, newIndex: number) => {
+    updateProject(projectId!, p => {
+      const tl = buildTimeline(p.phase_2_itinerary.events, { preserveOrder: true });
+      const reordered = arrayMove([...tl], oldIndex, newIndex);
+      return {
+        ...p,
+        phase_2_itinerary: {
+          ...p.phase_2_itinerary,
+          events: eventsFromTimeline(reordered),
+        },
+      };
+    });
   }, [projectId, updateProject]);
 
   if (!project) { navigate('/'); return null; }
@@ -275,14 +279,14 @@ export default function ExportPreview() {
 
         {/* Events */}
         <SortableList
-          items={project.phase_2_itinerary.events.map(e => e.id)}
-          onReorder={reorderEvents}
+          items={timeline.map(e => e.entryId)}
+          onReorder={reorderEntries}
         >
           {timeline.map((entry, idx) => {
             const event = entry.event;
             const table = buildEventTable(event, entry.isBookend);
             const isEditing = editingEvent === event.id;
-            const isDraggable = !entry.isBookend || entry.isBookend === 'check-in';
+            const isDraggable = true;
 
             const eventContent = (
               <div className="mb-6">
@@ -500,12 +504,12 @@ export default function ExportPreview() {
 
             if (isDraggable) {
               return (
-                <SortableItem key={`${event.id}-${entry.isBookend || idx}`} id={event.id}>
+                <SortableItem key={entry.entryId} id={entry.entryId}>
                   {eventContent}
                 </SortableItem>
               );
             }
-            return <div key={`${event.id}-${entry.isBookend || ''}`} className="ml-5">{eventContent}</div>;
+            return <div key={entry.entryId} className="ml-5">{eventContent}</div>;
           })}
         </SortableList>
 

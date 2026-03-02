@@ -6,19 +6,36 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const systemPrompt = `You are a travel planning assistant. Analyze the user's message and extract any travel planning information they've provided.
+const systemPrompt = `You are a thorough travel planning assistant. Analyze the user's message and extract travel planning information. You must be very diligent about gathering ALL necessary details.
 
 Extract these fields if mentioned:
 - tripName: a name for the trip
-- destination: the travel destination
-- travelers: list of travelers with names and whether they are minors (under 18)
-- transitViaUSA: whether they will transit through the USA
-- startDate: trip start date
-- endDate: trip end date
+- destination: the travel destination (country and city if possible)
+- travelers: list of travelers. For EACH traveler extract:
+  - name: their full name
+  - isMinor: whether they are under 18
+  - citizenship: their passport country / nationality (e.g. "Canadian", "US", "British")
+  - residency: their country of residence (e.g. "Canada", "USA", "UK") — this may differ from citizenship
+- transitViaUSA: whether they will transit through the USA (connecting flights, layovers, etc.)
+- transitCountry: any other transit country if not USA
+- startDate: trip start date (YYYY-MM-DD format if possible)
+- endDate: trip end date (YYYY-MM-DD format if possible)
 
-Also determine which fields are still missing and generate a friendly follow-up question asking ONLY about the missing information. If multiple fields are missing, ask about all of them in one natural conversational message.
+IMPORTANT RULES:
+1. Citizenship and residency are CRITICAL for determining visa/entry requirements. Always ask for both if not provided.
+2. Each traveler may have different citizenship and residency — ask about each person individually if unclear.
+3. If the user mentions a family or group, try to get names and details for each member.
+4. Transit countries matter for visa requirements — always confirm the routing.
+5. For minors, note that consent letters and additional documents are often required.
+6. Be conversational and friendly, but thorough. Don't skip any field.
 
-If ALL fields are provided, set allComplete to true and generate a summary confirmation message instead.`;
+When generating the followUpMessage:
+- Ask about ALL missing fields in one natural message
+- Be specific: "What nationality/citizenship does each traveler hold?" not just "tell me more"
+- If you have some travelers but missing their citizenship/residency, ask specifically for those details
+- Mention WHY you need certain info (e.g. "I need citizenship info to check visa requirements")
+
+If ALL fields are provided (including citizenship and residency for every traveler), set allComplete to true and generate a confirmation summary that includes each traveler's citizenship and residency.`;
 
 const toolDef = {
   type: "function",
@@ -40,18 +57,28 @@ const toolDef = {
                 properties: {
                   name: { type: "string" },
                   isMinor: { type: "boolean" },
+                  citizenship: { type: "string", description: "Passport country / nationality" },
+                  residency: { type: "string", description: "Country of current residence" },
                 },
                 required: ["name", "isMinor"],
               },
             },
             transitViaUSA: { type: "boolean" },
+            transitCountry: { type: "string", description: "Any non-USA transit country" },
             startDate: { type: "string" },
             endDate: { type: "string" },
           },
         },
         missingFields: {
           type: "array",
-          items: { type: "string", enum: ["tripName", "destination", "travelers", "transitViaUSA", "startDate", "endDate"] },
+          items: {
+            type: "string",
+            enum: [
+              "tripName", "destination", "travelers", "travelerCitizenship",
+              "travelerResidency", "transitViaUSA", "startDate", "endDate"
+            ],
+          },
+          description: "Include travelerCitizenship/travelerResidency if ANY traveler is missing those details",
         },
         followUpMessage: { type: "string" },
         allComplete: { type: "boolean" },
@@ -77,7 +104,7 @@ serve(async (req) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: "google/gemini-3-flash-preview",
         messages: [
           { role: "system", content: systemPrompt },
           ...messages,

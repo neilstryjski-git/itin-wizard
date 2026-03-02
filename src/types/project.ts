@@ -68,7 +68,7 @@ export interface TravelProject {
     destination: string;
     startDate?: string;
     endDate?: string;
-    travelers: { name: string; isMinor: boolean; passport?: string }[];
+    travelers: { name: string; isMinor: boolean; passport?: string; citizenship?: string; residency?: string }[];
     transitViaUSA: boolean;
     transitCountry?: string;
     createdAt: string;

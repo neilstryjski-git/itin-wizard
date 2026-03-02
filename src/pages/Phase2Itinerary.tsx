@@ -141,13 +141,36 @@ export default function Phase2Itinerary() {
       attachments: ev.attachments || [],
     } as ItineraryEvent));
 
-    updateProject(projectId!, p => ({
-      ...p,
-      phase_2_itinerary: {
-        rawInput,
-        events: [...p.phase_2_itinerary.events, ...eventsToAdd],
-      },
-    }));
+    // Sort new events chronologically (soonest first) before adding
+    eventsToAdd.sort((a, b) => {
+      const dateA = normalizeDate(a.date);
+      const dateB = normalizeDate(b.date);
+      if (dateA !== dateB) return dateA.localeCompare(dateB);
+      // Same day: sort by time
+      const timeA = a.type === 'flight' ? (a.departureTime || '') : (a.time || '');
+      const timeB = b.type === 'flight' ? (b.departureTime || '') : (b.time || '');
+      return timeA.localeCompare(timeB);
+    });
+
+    updateProject(projectId!, p => {
+      // Also sort the combined list chronologically on initial add
+      const allEvents = [...p.phase_2_itinerary.events, ...eventsToAdd];
+      allEvents.sort((a, b) => {
+        const dateA = normalizeDate(a.date);
+        const dateB = normalizeDate(b.date);
+        if (dateA !== dateB) return dateA.localeCompare(dateB);
+        const timeA = a.type === 'flight' ? (a.departureTime || '') : (a.time || '');
+        const timeB = b.type === 'flight' ? (b.departureTime || '') : (b.time || '');
+        return timeA.localeCompare(timeB);
+      });
+      return {
+        ...p,
+        phase_2_itinerary: {
+          rawInput,
+          events: allEvents,
+        },
+      };
+    });
     setPreviewEvents([]);
     setUploadedDocs([]);
     setRawInput('');

@@ -14,8 +14,9 @@ const WELCOME_MSG = `Welcome! Tell me about your trip — where you're going, wh
 interface ExtractedData {
   tripName?: string;
   destination?: string;
-  travelers?: { name: string; isMinor: boolean }[];
+  travelers?: { name: string; isMinor: boolean; citizenship?: string; residency?: string }[];
   transitViaUSA?: boolean;
+  transitCountry?: string;
   startDate?: string;
   endDate?: string;
 }
@@ -45,6 +46,7 @@ export default function Phase1Interview() {
         destination: project.metadata.destination,
         travelers: project.metadata.travelers,
         transitViaUSA: project.metadata.transitViaUSA,
+        transitCountry: project.metadata.transitCountry,
         startDate: project.metadata.startDate,
         endDate: project.metadata.endDate,
       });
@@ -98,8 +100,24 @@ export default function Phase1Interview() {
       const merged = { ...accumulated };
       if (extracted.tripName) merged.tripName = extracted.tripName;
       if (extracted.destination) merged.destination = extracted.destination;
-      if (extracted.travelers?.length) merged.travelers = extracted.travelers;
+      if (extracted.travelers?.length) {
+        // Merge traveler details - update existing travelers with new info
+        if (merged.travelers?.length) {
+          merged.travelers = extracted.travelers.map(newT => {
+            const existing = merged.travelers?.find(e => e.name.toLowerCase() === newT.name.toLowerCase());
+            return {
+              name: newT.name,
+              isMinor: newT.isMinor,
+              citizenship: newT.citizenship || existing?.citizenship,
+              residency: newT.residency || existing?.residency,
+            };
+          });
+        } else {
+          merged.travelers = extracted.travelers;
+        }
+      }
       if (extracted.transitViaUSA !== undefined && extracted.transitViaUSA !== null) merged.transitViaUSA = extracted.transitViaUSA;
+      if (extracted.transitCountry) merged.transitCountry = extracted.transitCountry;
       if (extracted.startDate) merged.startDate = extracted.startDate;
       if (extracted.endDate) merged.endDate = extracted.endDate;
       setAccumulated(merged);
@@ -111,6 +129,7 @@ export default function Phase1Interview() {
         if (merged.destination) md.destination = merged.destination;
         if (merged.travelers?.length) md.travelers = merged.travelers;
         if (merged.transitViaUSA !== undefined) md.transitViaUSA = merged.transitViaUSA;
+        if (merged.transitCountry) md.transitCountry = merged.transitCountry;
         if (merged.startDate) md.startDate = merged.startDate;
         if (merged.endDate) md.endDate = merged.endDate;
         return { ...p, metadata: md };
@@ -298,16 +317,44 @@ function generateChecklist(data: ExtractedData): RequirementItem[] {
   const id = () => crypto.randomUUID();
 
   const dest = data.destination?.toLowerCase() || '';
+  const travelers = data.travelers || [];
+  const hasMinors = travelers.some(t => t.isMinor);
 
-  items.push({ id: id(), title: 'Valid passports for all travelers', checked: false });
+  // Universal requirements
+  items.push({ id: id(), title: 'Valid passports for all travelers (check expiry — most countries require 6+ months validity)', checked: false });
   items.push({ id: id(), title: 'Travel insurance purchased', checked: false });
   items.push({ id: id(), title: 'Copies of all booking confirmations', checked: false });
   items.push({ id: id(), title: 'Emergency contact information sheet', checked: false });
+  items.push({ id: id(), title: 'Digital and printed copies of all travel documents', checked: false });
 
+  // Per-traveler citizenship-based requirements
+  const citizenships = [...new Set(travelers.map(t => t.citizenship?.toLowerCase()).filter(Boolean))];
+  const residencies = [...new Set(travelers.map(t => t.residency?.toLowerCase()).filter(Boolean))];
+
+  // ESTA / US visa requirements based on citizenship
+  if (data.transitViaUSA || dest.includes('united states') || dest.includes('usa') || dest.includes('us')) {
+    const needsESTA = (c: string) =>
+      ['canadian', 'canada'].every(x => !c.includes(x)); // Canadians don't need ESTA
+
+    const estaNeeded = travelers.filter(t => t.citizenship && needsESTA(t.citizenship.toLowerCase()));
+    if (estaNeeded.length > 0) {
+      items.push({
+        id: id(),
+        title: `ESTA authorization for USA ${data.transitViaUSA ? 'transit' : 'entry'} — required for: ${estaNeeded.map(t => t.name).join(', ')}`,
+        checked: false,
+        autoAdded: true,
+        url: 'https://esta.cbp.dhs.gov',
+        url_label: 'ESTA Application Portal',
+      });
+    }
+  }
+
+  // Belize specific
   if (dest.includes('belize')) {
     items.push({
       id: id(),
-      title: 'Complete Digital E-Embarkation Form at ideclare.gov.bz',
+      title: 'Complete Belize Digital E-Embarkation Form',
+      description: 'Required for all travelers entering Belize',
       checked: false,
       autoAdded: true,
       url: 'https://ideclare.gov.bz',
@@ -315,24 +362,117 @@ function generateChecklist(data: ExtractedData): RequirementItem[] {
     });
   }
 
-  const hasMinors = data.travelers?.some(t => t.isMinor) || false;
-  if (hasMinors && data.transitViaUSA) {
+  // EU/Schengen specific
+  const schengenCountries = ['france', 'germany', 'italy', 'spain', 'portugal', 'netherlands', 'belgium', 'austria', 'greece', 'switzerland', 'sweden', 'norway', 'denmark', 'finland', 'iceland', 'czech', 'poland', 'hungary', 'croatia'];
+  if (schengenCountries.some(c => dest.includes(c))) {
+    const nonEU = travelers.filter(t => {
+      const cit = t.citizenship?.toLowerCase() || '';
+      return !schengenCountries.some(c => cit.includes(c)) && !cit.includes('eu');
+    });
+    if (nonEU.length > 0) {
+      items.push({
+        id: id(),
+        title: `Check Schengen visa requirements for: ${nonEU.map(t => `${t.name} (${t.citizenship || 'unknown citizenship'})`).join(', ')}`,
+        description: 'Non-EU citizens may need a Schengen visa depending on nationality',
+        checked: false,
+        autoAdded: true,
+      });
+    }
     items.push({
       id: id(),
-      title: 'Notarized Consent Letters for minor travelers (required for USA transit)',
+      title: 'ETIAS travel authorization (if applicable)',
+      description: 'Required for visa-exempt non-EU nationals starting 2025',
+      checked: false,
+      autoAdded: true,
+      url: 'https://travel-europe.europa.eu/etias_en',
+      url_label: 'ETIAS Official Portal',
+    });
+  }
+
+  // UK specific
+  if (dest.includes('uk') || dest.includes('united kingdom') || dest.includes('england') || dest.includes('scotland') || dest.includes('london')) {
+    const nonBritish = travelers.filter(t => {
+      const cit = t.citizenship?.toLowerCase() || '';
+      return !cit.includes('british') && !cit.includes('uk');
+    });
+    if (nonBritish.length > 0) {
+      items.push({
+        id: id(),
+        title: `Check UK visa/ETA requirements for: ${nonBritish.map(t => `${t.name} (${t.citizenship || 'unknown'})`).join(', ')}`,
+        checked: false,
+        autoAdded: true,
+        url: 'https://www.gov.uk/check-uk-visa',
+        url_label: 'UK Visa Check',
+      });
+    }
+  }
+
+  // Mexico specific
+  if (dest.includes('mexico')) {
+    items.push({
+      id: id(),
+      title: 'Complete Mexico immigration form (FMM)',
+      description: 'Required for all visitors to Mexico',
       checked: false,
       autoAdded: true,
     });
   }
 
-  if (data.transitViaUSA) {
+  // Minor-specific requirements
+  if (hasMinors) {
+    const minorNames = travelers.filter(t => t.isMinor).map(t => t.name).join(', ');
+
+    if (data.transitViaUSA) {
+      items.push({
+        id: id(),
+        title: `Notarized consent letters for minor travelers transiting USA: ${minorNames}`,
+        description: 'Required when minors travel internationally, especially through the USA. Both parents must sign unless traveling together.',
+        checked: false,
+        autoAdded: true,
+      });
+    }
+
     items.push({
       id: id(),
-      title: 'ESTA authorization for USA transit',
+      title: `Birth certificates for minor travelers: ${minorNames}`,
+      description: 'May be required at border crossings to prove parental relationship',
       checked: false,
       autoAdded: true,
-      url: 'https://esta.cbp.dhs.gov',
-      url_label: 'ESTA Application Portal',
+    });
+
+    items.push({
+      id: id(),
+      title: `Parental consent / custody documents for: ${minorNames}`,
+      description: 'If only one parent is traveling, a notarized letter from the other parent is recommended',
+      checked: false,
+      autoAdded: true,
+    });
+  }
+
+  // Residency-based notes
+  const canadianResidents = travelers.filter(t => t.residency?.toLowerCase().includes('canad'));
+  if (canadianResidents.length > 0) {
+    const nonCitizens = canadianResidents.filter(t => !t.citizenship?.toLowerCase().includes('canad'));
+    if (nonCitizens.length > 0) {
+      items.push({
+        id: id(),
+        title: `Verify PR card validity for Canadian residents who are not citizens: ${nonCitizens.map(t => t.name).join(', ')}`,
+        description: 'Permanent residents need a valid PR card to re-enter Canada',
+        checked: false,
+        autoAdded: true,
+      });
+    }
+  }
+
+  // Health & vaccination
+  const tropicalDests = ['belize', 'mexico', 'costa rica', 'colombia', 'brazil', 'thailand', 'vietnam', 'indonesia', 'india', 'kenya', 'tanzania', 'south africa'];
+  if (tropicalDests.some(c => dest.includes(c))) {
+    items.push({
+      id: id(),
+      title: 'Check vaccination requirements and travel health advisories',
+      description: 'Some destinations require proof of yellow fever, COVID, or other vaccinations',
+      checked: false,
+      autoAdded: true,
     });
   }
 

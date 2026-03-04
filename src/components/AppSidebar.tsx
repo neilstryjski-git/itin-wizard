@@ -1,19 +1,20 @@
 import { useLocation } from 'react-router-dom';
 import {
-  Palmtree, LayoutDashboard, MessageCircle, CalendarDays, Backpack, Map, ChevronRight,
+  Palmtree, LayoutDashboard, MessageCircle, CalendarDays, Backpack, Map, ChevronRight, LogOut, Mail,
 } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
-  SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarHeader, useSidebar,
+  SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarHeader, SidebarFooter, useSidebar,
 } from '@/components/ui/sidebar';
 import { useProjectsContext } from '@/contexts/ProjectsContext';
+import { Button } from '@/components/ui/button';
 
 export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === 'collapsed';
   const location = useLocation();
-  const { getProject } = useProjectsContext();
+  const { getProject, email, clearEmail } = useProjectsContext();
   const projectMatch = location.pathname.match(/\/project\/([^/]+)/);
   const projectId = projectMatch ? projectMatch[1] : undefined;
   const project = projectId ? getProject(projectId) : undefined;
@@ -87,6 +88,22 @@ export function AppSidebar() {
           </SidebarGroup>
         )}
       </SidebarContent>
+
+      {email && (
+        <SidebarFooter className="p-3 border-t">
+          <div className="flex items-center gap-2 min-w-0">
+            <Mail className="h-4 w-4 shrink-0 text-muted-foreground" />
+            {!collapsed && (
+              <span className="text-xs text-muted-foreground truncate flex-1">{email}</span>
+            )}
+            {!collapsed && (
+              <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={clearEmail} title="Switch identity">
+                <LogOut className="h-3 w-3" />
+              </Button>
+            )}
+          </div>
+        </SidebarFooter>
+      )}
     </Sidebar>
   );
 }

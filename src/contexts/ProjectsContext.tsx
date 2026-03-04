@@ -1,20 +1,30 @@
 import React, { createContext, useContext } from 'react';
 import { useProjects } from '@/hooks/useProjects';
+import { useUserEmail } from '@/hooks/useUserEmail';
 import { TravelProject } from '@/types/project';
 
 interface ProjectsContextType {
   projects: TravelProject[];
+  isLoading: boolean;
   addProject: (p: TravelProject) => void;
   updateProject: (id: string, updater: (p: TravelProject) => TravelProject) => void;
   deleteProject: (id: string) => void;
   getProject: (id: string) => TravelProject | undefined;
+  email: string | null;
+  setEmail: (email: string) => void;
+  clearEmail: () => void;
 }
 
 const ProjectsContext = createContext<ProjectsContextType | null>(null);
 
 export function ProjectsProvider({ children }: { children: React.ReactNode }) {
-  const value = useProjects();
-  return <ProjectsContext.Provider value={value}>{children}</ProjectsContext.Provider>;
+  const { email, setEmail, clearEmail } = useUserEmail();
+  const projectsData = useProjects(email);
+  return (
+    <ProjectsContext.Provider value={{ ...projectsData, email, setEmail, clearEmail }}>
+      {children}
+    </ProjectsContext.Provider>
+  );
 }
 
 export function useProjectsContext() {

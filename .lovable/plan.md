@@ -1,23 +1,50 @@
 
 
-## Problem Analysis
+## Plan: User-Scoped Trips via Email Identity
 
-The `buildTimeline` sorting relies on string comparison of `displayDate` values. If `normalizeDate` fails to convert any date to `YYYY-MM-DD` (returning the original string instead), string comparison breaks ordering. Additionally, the `new Date()` fallback on line 37-39 creates UTC dates for ISO-formatted strings, which `date-fns`'s `format()` then renders in local time — potentially shifting dates by a day for users west of UTC.
+### Approach
 
-## Root Causes
+Use a lightweight email-based identity system — no password, no verification. Users enter their email once, it's stored in `localStorage`, and all trips are scoped to that email. This keeps things simple now while enabling sharing later (since trips will have an `owner_email` and eventually a `shared_with` list).
 
-1. **Fragile string-based sorting** — If even one event's date doesn't normalize to `YYYY-MM-DD`, the `localeCompare` sort produces wrong results
-2. **UTC timezone trap** — `new Date('2026-03-15')` → UTC midnight → `format()` uses local time → date shifts back one day in western timezones
-3. **Missing format coverage** — ISO datetime strings like `2026-03-15T00:00:00.000Z` bypass the ISO regex and hit the buggy fallback
+### Database
 
-## Plan
+Move trip storage from `localStorage` to the database so trips can be queried by email and eventually shared.
 
-### 1. Fix `normalizeDate` in `src/lib/itinerary-utils.ts`
-- Add handling for ISO datetime strings (`2026-03-15T...`) — extract just the date part before the `T`
-- Fix the `new Date()` fallback to use local date components (`getFullYear/getMonth/getDate`) instead of `date-fns format()` to avoid UTC→local shifts
-- Add `"MMMM d, yyyy"` and `"MMM d, yyyy"` to the date-fns format list for free-text dates
+**New table: `projects`**
+- `id` (uuid, PK)
+- `project_id` (text, unique) — matches existing `project_id` in the JSON
+- `owner_email` (text, not null) — the creator's email
+- `data` (jsonb, not null) — the full `TravelProject` object
+- `created_at`, `updated_at` (timestamptz)
+- RLS disabled initially (no auth — just email-based filtering client-side)
 
-### 2. Make `buildTimeline` sort use numeric comparison instead of string comparison
-- Convert normalized dates to `Date` objects (using `new Date(year, month-1, day)` from parsed parts) for numeric comparison
-- Fall back to `0` timestamp for unparseable dates so they sort to the top (visible) rather than randomly scattered
+**Future sharing table (not built now, just noted):**
+- `project_shares` with `project_id`, `shared_with_email`, `permission` (view/edit)
+
+### Frontend Changes
+
+1. **Email prompt component** — A simple modal/page that asks "Enter your email to get started". Stores email in `localStorage` under a key like `travel-user-email`. Shows on app load if no email is set. Includes a "Change identity" option in the sidebar.
+
+2. **Refactor `useProjects` hook** — Replace `localStorage` read/write with database queries filtered by `owner_email`. Use `@tanstack/react-query` for fetching and mutations against the `projects` table.
+
+3. **Update `ProjectsContext`** — Expose the current user email alongside projects. Pass `owner_email` when creating new projects.
+
+4. **Dashboard** — Only shows trips belonging to the current email. No other changes needed.
+
+5. **Sidebar** — Show current email, with option to switch/logout.
+
+### Why This Sets Up Sharing
+
+Since every trip has an `owner_email` stored in the database, a future sharing feature just needs:
+- A `project_shares` table
+- Query projects where `owner_email = me OR shared_with = me`
+- Permission checks on mutations
+
+### Steps
+
+1. Create `projects` table (with RLS allowing all access for now — no auth)
+2. Build email prompt component
+3. Refactor `useProjects` to use database + email filtering
+4. Update sidebar to show current user email
+5. Migrate seed data handling to work with new flow
 

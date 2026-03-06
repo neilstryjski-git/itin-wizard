@@ -65,9 +65,9 @@ export const EVENT_EMOJI: Record<string, string> = {
 
 export const EVENT_TYPE_LABELS: Record<string, string> = {
   'flight': 'Flight',
-  'check-in': 'Check-In',
-  'check-out': 'Check-Out',
-  'accommodation': 'Accommodation',
+  'check-in': 'Accommodation Check-In',
+  'check-out': 'Accommodation Check-Out',
+  'accommodation': 'Accommodation (Stay)',
   'activity': 'Activity',
   'transfer': 'Transfer',
 };
@@ -187,9 +187,9 @@ export function getEventTitle(event: ItineraryEvent): string {
 /** PDF-safe event title (no emoji — jsPDF can't render them) */
 const PDF_TYPE_PREFIX: Record<string, string> = {
   'flight': '[Flight]',
-  'check-in': '[Check-In]',
-  'check-out': '[Check-Out]',
-  'accommodation': '[Accommodation]',
+  'check-in': '[Accommodation Check-In]',
+  'check-out': '[Accommodation Check-Out]',
+  'accommodation': '[Accommodation (Stay)]',
   'activity': '[Activity]',
   'transfer': '[Transfer]',
 };
@@ -291,16 +291,64 @@ export function buildTimeline(events: ItineraryEvent[], options?: { preserveOrde
 /**
  * Given a reordered timeline (by entryId), reconstruct the deduplicated
  * events array preserving the new visual order.
- * Accommodation events appear at the position of their first entry (check-in or check-out).
+ * If an accommodation event has been interleaved (e.g. Activity between Check-In and Check-Out),
+ * it is split into separate check-in and check-out events.
  */
 export function eventsFromTimeline(entries: TimelineEntry[]): ItineraryEvent[] {
-  const seen = new Set<string>();
   const result: ItineraryEvent[] = [];
-  for (const entry of entries) {
-    if (!seen.has(entry.event.id)) {
-      seen.add(entry.event.id);
-      result.push(entry.event);
+  const processed = new Map<string, { checkInAt: number; hasOut: boolean }>();
+
+  for (let i = 0; i < entries.length; i++) {
+    const entry = entries[i];
+    const event = { ...entry.event };
+    const eventId = event.id;
+
+    if (event.type === 'accommodation') {
+      const state = processed.get(eventId);
+
+      if (!state) {
+        // First time seeing this accommodation event
+        if (entry.isBookend === 'check-out') {
+          // Rare: Moved check-out before check-in or it's the only one.
+          // Convert to standalone check-out.
+          event.type = 'check-out';
+          event.date = event.endDate || event.date;
+          event.endDate = undefined;
+          result.push(event);
+        } else {
+          // This is the check-in (or first entry).
+          // Keep it as accommodation for now, but mark its position.
+          processed.set(eventId, { checkInAt: result.length, hasOut: false });
+          result.push(event);
+        }
+      } else {
+        // We've seen the check-in already.
+        const isInterleaved = state.checkInAt !== result.length - 1;
+
+        if (isInterleaved) {
+          // Something was put between Check-In and this entry (likely Check-Out).
+          // Split into separate events.
+          const checkInEvent = result[state.checkInAt];
+          checkInEvent.type = 'check-in';
+          checkInEvent.endDate = undefined;
+          
+          // Current entry becomes a standalone check-out
+          event.id = `${eventId}::split-out`; // Unique ID to avoid collision
+          event.type = 'check-out';
+          event.date = event.endDate || event.date;
+          event.endDate = undefined;
+          result.push(event);
+        } else {
+          // Not interleaved yet (Check-Out is right after Check-In).
+          // We can keep it as a single 'accommodation' event.
+          state.hasOut = true;
+        }
+      }
+    } else {
+      // Normal event
+      result.push(event);
     }
   }
+
   return result;
 }

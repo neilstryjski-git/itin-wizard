@@ -6,6 +6,7 @@ import { FileAttachment } from '@/types/project';
 interface FileDropZoneProps {
   onFilesAdded: (files: FileAttachment[]) => void;
   compact?: boolean;
+  disabled?: boolean;
 }
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB per file
@@ -22,11 +23,12 @@ function formatSize(bytes: number) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export function FileDropZone({ onFilesAdded, compact }: FileDropZoneProps) {
+export function FileDropZone({ onFilesAdded, compact, disabled }: FileDropZoneProps) {
   const [dragging, setDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const processFiles = useCallback(async (fileList: FileList | File[]) => {
+    if (disabled) return;
     const files = Array.from(fileList);
     const attachments: FileAttachment[] = [];
 
@@ -53,11 +55,16 @@ export function FileDropZone({ onFilesAdded, compact }: FileDropZoneProps) {
     }
 
     if (attachments.length > 0) onFilesAdded(attachments);
-  }, [onFilesAdded]);
+  }, [onFilesAdded, disabled]);
 
-  const handleDragOver = (e: DragEvent) => { e.preventDefault(); setDragging(true); };
+  const handleDragOver = (e: DragEvent) => { 
+    if (disabled) return;
+    e.preventDefault(); 
+    setDragging(true); 
+  };
   const handleDragLeave = () => setDragging(false);
   const handleDrop = (e: DragEvent) => {
+    if (disabled) return;
     e.preventDefault();
     setDragging(false);
     if (e.dataTransfer.files.length > 0) processFiles(e.dataTransfer.files);
@@ -71,12 +78,14 @@ export function FileDropZone({ onFilesAdded, compact }: FileDropZoneProps) {
           type="file"
           multiple
           className="hidden"
+          disabled={disabled}
           onChange={e => e.target.files && processFiles(e.target.files)}
         />
         <Button
           variant="ghost"
           size="icon"
           className="h-8 w-8"
+          disabled={disabled}
           onClick={() => inputRef.current?.click()}
           title="Attach file"
         >
@@ -91,16 +100,17 @@ export function FileDropZone({ onFilesAdded, compact }: FileDropZoneProps) {
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      className={`border-2 border-dashed rounded-lg p-4 text-center transition-colors cursor-pointer ${
-        dragging ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/40'
+      className={`border-2 border-dashed rounded-lg p-4 text-center transition-colors ${
+        disabled ? 'opacity-50 cursor-not-allowed border-muted' : 'cursor-pointer ' + (dragging ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/40')
       }`}
-      onClick={() => inputRef.current?.click()}
+      onClick={() => !disabled && inputRef.current?.click()}
     >
       <input
         ref={inputRef}
         type="file"
         multiple
         className="hidden"
+        disabled={disabled}
         onChange={e => e.target.files && processFiles(e.target.files)}
       />
       <Upload className="h-6 w-6 mx-auto mb-2 text-muted-foreground" />

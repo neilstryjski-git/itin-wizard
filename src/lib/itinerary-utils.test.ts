@@ -131,6 +131,18 @@ describe('getEventTitlePdf', () => {
   it('uses text prefix instead of emoji', () => {
     expect(getEventTitlePdf(makeEvent({ type: 'flight', title: 'LAX → NRT' }))).toBe('[Flight] LAX → NRT');
   });
+
+  it('uses [Accommodation Check-In] for check-in', () => {
+    expect(getEventTitlePdf(makeEvent({ type: 'check-in', title: 'Hotel' }))).toBe('[Accommodation Check-In] Hotel');
+  });
+
+  it('uses [Accommodation Check-Out] for check-out', () => {
+    expect(getEventTitlePdf(makeEvent({ type: 'check-out', title: 'Hotel' }))).toBe('[Accommodation Check-Out] Hotel');
+  });
+
+  it('uses [Accommodation (Stay)] for accommodation', () => {
+    expect(getEventTitlePdf(makeEvent({ type: 'accommodation', title: 'Hotel' }))).toBe('[Accommodation (Stay)] Hotel');
+  });
 });
 
 // ─── stripEmoji ───────────────────────────────────────────
@@ -251,6 +263,37 @@ describe('eventsFromTimeline', () => {
     const timeline = buildTimeline(events);
     const result = eventsFromTimeline(timeline);
     expect(result.map(e => e.id)).toEqual(['a', 'b']);
+  });
+
+  it('successfully interleaves an activity between check-in and check-out', () => {
+    const hotel = makeEvent({ id: 'hotel', type: 'accommodation', date: '2026-03-15', endDate: '2026-03-17' });
+    const activity = makeEvent({ id: 'activity', type: 'activity', date: '2026-03-16' });
+    
+    // Simulating the timeline after a manual reorder: [Check-in, Activity, Check-out]
+    const timeline: any = [
+      { entryId: 'hotel::check-in', event: hotel, isBookend: 'check-in' },
+      { entryId: 'activity', event: activity },
+      { entryId: 'hotel::check-out', event: hotel, isBookend: 'check-out' },
+    ];
+    
+    const result = eventsFromTimeline(timeline);
+    
+    // EXPECTED: hotel event at index 0 becomes 'check-in', activity is at index 1, 
+    // and a NEW event object (or same id, different type) for 'check-out' is at index 2.
+    expect(result).toHaveLength(3);
+    expect(result[0].type).toBe('check-in');
+    expect(result[1].id).toBe('activity');
+    expect(result[2].type).toBe('check-out');
+    
+    // Feed back into buildTimeline (with preserveOrder)
+    const finalTimeline = buildTimeline(result, { preserveOrder: true });
+    const finalIds = finalTimeline.map(e => e.entryId);
+    
+    // It should now correctly be interleaved!
+    // Since hotel at index 2 has ID 'hotel::split-out' and type 'check-out',
+    // its entryId in timeline will be its ID 'hotel::split-out'.
+    // The check-in at index 0 has type 'check-in', its entryId will be 'hotel'.
+    expect(finalIds).toEqual(['hotel', 'activity', 'hotel::split-out']);
   });
 });
 

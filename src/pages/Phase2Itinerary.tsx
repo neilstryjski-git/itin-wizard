@@ -29,9 +29,9 @@ const EVENT_ICONS: Record<string, any> = {
 
 const EVENT_LABELS: Record<string, string> = {
   'flight': 'Flight',
-  'check-in': 'Check-In',
-  'check-out': 'Check-Out',
-  'accommodation': 'Accommodation',
+  'check-in': 'Accommodation Check-In',
+  'check-out': 'Accommodation Check-Out',
+  'accommodation': 'Accommodation (Stay)',
   'activity': 'Activity',
   'transfer': 'Transfer',
 };
@@ -453,7 +453,7 @@ export default function Phase2Itinerary() {
               const Icon = EVENT_ICONS[displayType] || MapPin;
               const isEditing = editingId === event.id;
               const missing = hasMissing(event);
-              const bookendLabel = isBookend === 'check-in' ? 'Check-In' : isBookend === 'check-out' ? 'Check-Out' : EVENT_LABELS[event.type];
+              const bookendLabel = EVENT_LABELS[displayType] || displayType;
               const isDraggable = true;
 
               const cardContent = (
@@ -593,6 +593,60 @@ function EditForm({
   onSave: () => void;
   onCancel: () => void;
 }) {
+  const [isUpdating, setIsUpdating] = useState(false);
+
+  const updateWithAI = async (files: FileAttachment[]) => {
+    if (files.length === 0) return;
+    setIsUpdating(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('parse-itinerary', {
+        body: {
+          files: files.map(f => ({ data: f.data, name: f.name, type: f.type })),
+        },
+      });
+      if (error) throw error;
+      
+      const parsedEvents = data.events || [];
+      if (parsedEvents.length > 0) {
+        // Merge the first parsed event into the current form
+        const newInfo = parsedEvents[0];
+        const merged: Partial<ItineraryEvent> = { ...form };
+        
+        // Only override if the AI found something new/specific
+        if (newInfo.title) merged.title = newInfo.title;
+        if (newInfo.date) merged.date = normalizeDate(newInfo.date);
+        if (newInfo.endDate) merged.endDate = normalizeDate(newInfo.endDate);
+        if (newInfo.time) merged.time = newInfo.time;
+        if (newInfo.location) merged.location = newInfo.location;
+        if (newInfo.address) merged.address = newInfo.address;
+        if (newInfo.confirmationCode) merged.confirmationCode = newInfo.confirmationCode;
+        if (newInfo.flightNumber) merged.flightNumber = newInfo.flightNumber;
+        if (newInfo.departureLocation) merged.departureLocation = newInfo.departureLocation;
+        if (newInfo.departureTime) merged.departureTime = newInfo.departureTime;
+        if (newInfo.arrivalLocation) merged.arrivalLocation = newInfo.arrivalLocation;
+        if (newInfo.arrivalTime) merged.arrivalTime = newInfo.arrivalTime;
+        
+        if (newInfo.links && newInfo.links.length > 0) {
+          merged.links = [...(merged.links || []), ...newInfo.links];
+        }
+        
+        if (newInfo.notes) {
+          merged.notes = merged.notes ? `${merged.notes}; ${newInfo.notes}` : newInfo.notes;
+        }
+
+        setForm(merged);
+        toast.success("Event updated with data from your document.");
+      } else {
+        toast.info("No event data found in that document.");
+      }
+    } catch (err) {
+      console.error("AI Update failed:", err);
+      toast.error("Could not update with AI.");
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
   const addLink = () => {
     setForm({ ...form, links: [...(form.links || []), { label: '', url: '' }] });
   };
@@ -608,7 +662,24 @@ function EditForm({
   };
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
+      <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg flex items-center justify-between">
+        <div className="flex items-center gap-2 text-sm font-medium">
+          <Sparkles className="h-4 w-4 text-primary" />
+          Update details from a new document?
+        </div>
+        <FileDropZone 
+          compact 
+          onFilesAdded={updateWithAI}
+          disabled={isUpdating}
+        />
+      </div>
+      {isUpdating && (
+        <div className="flex items-center justify-center gap-2 text-sm text-primary animate-pulse py-2">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Analyzing document...
+        </div>
+      )}
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="text-xs font-medium text-muted-foreground">Type</label>

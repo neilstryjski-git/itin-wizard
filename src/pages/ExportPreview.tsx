@@ -2,21 +2,23 @@ import { useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Download, ArrowLeft, Plus, X, Pencil, Check, Link as LinkIcon,
-  ExternalLink,
+  ExternalLink, Sparkles, Loader2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { useProjectsContext } from '@/contexts/ProjectsContext';
-import { ItineraryEvent, TravelLink } from '@/types/project';
+import { ItineraryEvent, TravelLink, FileAttachment } from '@/types/project';
 import {
-  EVENT_EMOJI, EVENT_TYPE_LABELS, formatDate, formatTime,
+  EVENT_EMOJI, EVENT_TYPE_LABELS, formatDate, formatTime, normalizeDate,
   buildEventTable, getEventTitle, getEventTitlePdf, stripEmoji, buildTimeline, googleMapsUrl, eventsFromTimeline,
 } from '@/lib/itinerary-utils';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { toast } from 'sonner';
 import { SortableList, SortableItem, arrayMove } from '@/components/SortableEventList';
+import { supabase } from '@/integrations/supabase/client';
+import { FileDropZone } from '@/components/FileDropZone';
 
 export default function ExportPreview() {
   const { projectId } = useParams<{ projectId: string }>();
@@ -25,6 +27,7 @@ export default function ExportPreview() {
   const project = getProject(projectId!);
 
   const [editingEvent, setEditingEvent] = useState<string | null>(null);
+  const [isUpdatingAI, setIsUpdatingAI] = useState<string | null>(null);
   const [linkForm, setLinkForm] = useState<{ eventId: string; label: string; url: string; mode: 'link' | 'note' } | null>(null);
   const [notesEdit, setNotesEdit] = useState<{ eventId: string; field: string; value: string } | null>(null);
   const [fieldLinkEdit, setFieldLinkEdit] = useState<{ eventId: string; field: string; url: string } | null>(null);
@@ -57,6 +60,58 @@ export default function ExportPreview() {
         ),
       },
     }));
+  };
+
+  const handleAIUpdate = async (eventId: string, files: FileAttachment[]) => {
+    if (files.length === 0) return;
+    setIsUpdatingAI(eventId);
+    try {
+      const { data, error } = await supabase.functions.invoke('parse-itinerary', {
+        body: {
+          files: files.map(f => ({ data: f.data, name: f.name, type: f.type })),
+        },
+      });
+      if (error) throw error;
+      
+      const parsedEvents = data.events || [];
+      if (parsedEvents.length > 0) {
+        const newInfo = parsedEvents[0];
+        const event = project.phase_2_itinerary.events.find(e => e.id === eventId);
+        if (!event) return;
+
+        const updates: Partial<ItineraryEvent> = {};
+        if (newInfo.title) updates.title = newInfo.title;
+        if (newInfo.date) updates.date = normalizeDate(newInfo.date);
+        if (newInfo.endDate) updates.endDate = normalizeDate(newInfo.endDate);
+        if (newInfo.time) updates.time = newInfo.time;
+        if (newInfo.location) updates.location = newInfo.location;
+        if (newInfo.address) updates.address = newInfo.address;
+        if (newInfo.confirmationCode) updates.confirmationCode = newInfo.confirmationCode;
+        if (newInfo.flightNumber) updates.flightNumber = newInfo.flightNumber;
+        if (newInfo.departureLocation) updates.departureLocation = newInfo.departureLocation;
+        if (newInfo.departureTime) updates.departureTime = newInfo.departureTime;
+        if (newInfo.arrivalLocation) updates.arrivalLocation = newInfo.arrivalLocation;
+        if (newInfo.arrivalTime) updates.arrivalTime = newInfo.arrivalTime;
+        
+        if (newInfo.links && newInfo.links.length > 0) {
+          updates.links = [...(event.links || []), ...newInfo.links];
+        }
+        
+        if (newInfo.notes) {
+          updates.notes = event.notes ? `${event.notes}; ${newInfo.notes}` : newInfo.notes;
+        }
+
+        updateEvent(eventId, updates);
+        toast.success("Event updated with data from your document.");
+      } else {
+        toast.info("No event data found in that document.");
+      }
+    } catch (err) {
+      console.error("AI Update failed:", err);
+      toast.error("Could not update with AI.");
+    } finally {
+      setIsUpdatingAI(null);
+    }
   };
 
   const addLink = (eventId: string, link: TravelLink) => {
@@ -301,6 +356,27 @@ export default function ExportPreview() {
                     {isEditing ? <><Check className="h-3 w-3" /> Done</> : <><Pencil className="h-3 w-3" /> Edit</>}
                   </Button>
                 </div>
+
+                {isEditing && (
+                  <div className="mb-4 p-3 bg-primary/5 border border-primary/20 rounded-lg flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-sm font-medium">
+                      <Sparkles className="h-4 w-4 text-primary" />
+                      Update details from a new document?
+                    </div>
+                    <FileDropZone 
+                      compact 
+                      onFilesAdded={(files) => handleAIUpdate(event.id, files)}
+                      disabled={!!isUpdatingAI}
+                    />
+                  </div>
+                )}
+                
+                {isUpdatingAI === event.id && (
+                  <div className="flex items-center justify-center gap-2 text-sm text-primary animate-pulse py-2 mb-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Analyzing document...
+                  </div>
+                )}
 
                 {/* Table */}
                 <table className="w-full text-sm border border-border">

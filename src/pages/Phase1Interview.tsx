@@ -74,7 +74,7 @@ export default function Phase1Interview() {
   }
 
   const handleSend = async () => {
-    if (!input.trim() || isAnalyzing || isCompleted) return;
+    if (!input.trim() || isAnalyzing) return;
 
     const userMsg: ChatMessage = { id: crypto.randomUUID(), role: 'user', text: input.trim() };
     const newMessages = [...messages, userMsg];
@@ -88,13 +88,16 @@ export default function Phase1Interview() {
         .map(m => ({ role: m.role, content: m.text }));
 
       const { data, error } = await supabase.functions.invoke('analyze-interview', {
-        body: { messages: aiMessages },
+        body: { 
+          messages: aiMessages,
+          currentChecklist: project.phase_1_requirements.checklist 
+        },
       });
 
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
 
-      const { extracted, missingFields, followUpMessage, allComplete } = data;
+      const { extracted, missingFields, followUpMessage, allComplete, checklistUpdates } = data;
 
       // Merge extracted data with accumulated
       const merged = { ...accumulated };
@@ -143,7 +146,7 @@ export default function Phase1Interview() {
       const updatedMessages = [...newMessages, botMsg];
       setMessages(updatedMessages);
 
-      if (allComplete) {
+      if (allComplete && !isCompleted) {
         const checklist = generateChecklist(merged);
         setIsCompleted(true);
         updateProject(projectId!, p => ({
@@ -155,6 +158,40 @@ export default function Phase1Interview() {
             checklist,
           },
         }));
+      } else if (checklistUpdates) {
+        updateProject(projectId!, p => {
+          let newList = [...p.phase_1_requirements.checklist];
+          
+          if (checklistUpdates.remove) {
+            newList = newList.filter(item => !checklistUpdates.remove.includes(item.id));
+          }
+          
+          if (checklistUpdates.update) {
+            newList = newList.map(item => {
+              const update = checklistUpdates.update.find((u: any) => u.id === item.id);
+              return update ? { ...item, ...update } : item;
+            });
+          }
+          
+          if (checklistUpdates.add) {
+            const newItems = checklistUpdates.add.map((item: any) => ({
+              id: crypto.randomUUID(),
+              checked: false,
+              autoAdded: true,
+              ...item
+            }));
+            newList = [...newList, ...newItems];
+          }
+          
+          return {
+            ...p,
+            phase_1_requirements: {
+              ...p.phase_1_requirements,
+              chatHistory: updatedMessages,
+              checklist: newList
+            }
+          };
+        });
       } else {
         // Save chat history
         updateProject(projectId!, p => ({
@@ -197,7 +234,7 @@ export default function Phase1Interview() {
       <div className="p-4 border-b bg-card">
         <h2 className="font-heading text-xl font-semibold">Travel Interview</h2>
         <p className="text-sm text-muted-foreground">
-          {isCompleted ? 'Interview complete' : 'Tell me about your trip — I\'ll ask only what I need'}
+          {isCompleted ? 'Interview complete — you can refine the checklist below' : 'Tell me about your trip — I\'ll ask only what I need'}
         </p>
       </div>
 
@@ -262,7 +299,7 @@ export default function Phase1Interview() {
                     <span className={`text-sm font-medium ${item.checked ? 'line-through text-muted-foreground' : ''}`}>
                       {item.title}
                       {item.autoAdded && (
-                        <span className="ml-1 text-xs text-warning">⚡ Auto-detected</span>
+                        <span className="ml-1 text-xs text-warning">⚡ AI Managed</span>
                       )}
                     </span>
                     {item.description && (
@@ -288,26 +325,24 @@ export default function Phase1Interview() {
         )}
       </div>
 
-      {!isCompleted && (
-        <div className="p-4 border-t bg-card">
-          <form onSubmit={e => { e.preventDefault(); handleSend(); }} className="flex gap-2">
-            <Textarea
-              ref={textareaRef}
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Tell me about your trip... (Shift+Enter for new line)"
-              className="flex-1 min-h-[44px] max-h-[120px] resize-none"
-              rows={1}
-              disabled={isAnalyzing}
-              autoFocus
-            />
-            <Button type="submit" size="icon" disabled={isAnalyzing || !input.trim()}>
-              {isAnalyzing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-            </Button>
-          </form>
-        </div>
-      )}
+      <div className="p-4 border-t bg-card">
+        <form onSubmit={e => { e.preventDefault(); handleSend(); }} className="flex gap-2">
+          <Textarea
+            ref={textareaRef}
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder={isCompleted ? "Add, change or delete checklist items..." : "Tell me about your trip... (Shift+Enter for new line)"}
+            className="flex-1 min-h-[44px] max-h-[120px] resize-none"
+            rows={1}
+            disabled={isAnalyzing}
+            autoFocus
+          />
+          <Button type="submit" size="icon" disabled={isAnalyzing || !input.trim()}>
+            {isAnalyzing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+          </Button>
+        </form>
+      </div>
     </div>
   );
 }

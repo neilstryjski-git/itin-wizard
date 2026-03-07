@@ -29,11 +29,19 @@ IMPORTANT RULES:
 5. For minors, note that consent letters and additional documents are often required.
 6. Be conversational and friendly, but thorough. Don't skip any field.
 
+CHECKLIST REFINEMENT:
+If a checklist is provided in the input, the user might want to add, change, or delete items. 
+- If they mention something new that needs to be done, suggest adding it.
+- If they want to change an existing item, suggest an update.
+- If they want to remove something, suggest removing it.
+Only suggest changes if the user's input clearly warrants it.
+
 When generating the followUpMessage:
 - Ask about ALL missing fields in one natural message
 - Be specific: "What nationality/citizenship does each traveler hold?" not just "tell me more"
 - If you have some travelers but missing their citizenship/residency, ask specifically for those details
 - Mention WHY you need certain info (e.g. "I need citizenship info to check visa requirements")
+- If refining a checklist, acknowledge the changes you've made.
 
 If ALL fields are provided (including citizenship and residency for every traveler), set allComplete to true and generate a confirmation summary that includes each traveler's citizenship and residency.`;
 
@@ -41,7 +49,7 @@ const toolDef = {
   type: "function",
   function: {
     name: "return_analysis",
-    description: "Return the extracted travel info and follow-up question.",
+    description: "Return the extracted travel info, follow-up question, and checklist updates.",
     parameters: {
       type: "object",
       properties: {
@@ -82,6 +90,43 @@ const toolDef = {
         },
         followUpMessage: { type: "string" },
         allComplete: { type: "boolean" },
+        checklistUpdates: {
+          type: "object",
+          properties: {
+            add: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  title: { type: "string" },
+                  description: { type: "string" },
+                  url: { type: "string" },
+                  url_label: { type: "string" },
+                },
+                required: ["title"],
+              },
+            },
+            update: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  id: { type: "string" },
+                  title: { type: "string" },
+                  description: { type: "string" },
+                  url: { type: "string" },
+                  url_label: { type: "string" },
+                  checked: { type: "boolean" },
+                },
+                required: ["id"],
+              },
+            },
+            remove: {
+              type: "array",
+              items: { type: "string", description: "The ID of the item to remove" },
+            },
+          },
+        },
       },
       required: ["extracted", "missingFields", "followUpMessage", "allComplete"],
     },
@@ -92,10 +137,23 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { messages } = await req.json();
+    const { messages, currentChecklist } = await req.json();
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+
+    const userMessages = [
+      { role: "system", content: systemPrompt },
+    ];
+
+    if (currentChecklist && currentChecklist.length > 0) {
+      userMessages.push({
+        role: "system",
+        content: `The current checklist is: ${JSON.stringify(currentChecklist)}. You can suggest updates to this checklist based on the conversation.`
+      });
+    }
+
+    userMessages.push(...messages);
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -104,11 +162,8 @@ serve(async (req) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: [
-          { role: "system", content: systemPrompt },
-          ...messages,
-        ],
+        model: "google/gemini-2.0-flash-exp",
+        messages: userMessages,
         tools: [toolDef],
         tool_choice: { type: "function", function: { name: "return_analysis" } },
       }),

@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent } from '@/components/ui/card';
 import { useProjectsContext } from '@/contexts/ProjectsContext';
 import { ItineraryEvent, TravelLink, FileAttachment } from '@/types/project';
@@ -28,6 +29,7 @@ export default function ExportPreview() {
 
   const [editingEvent, setEditingEvent] = useState<string | null>(null);
   const [isUpdatingAI, setIsUpdatingAI] = useState<string | null>(null);
+  const [parsingEventId, setParsingEventId] = useState<string | null>(null);
   const [linkForm, setLinkForm] = useState<{ eventId: string; label: string; url: string; mode: 'link' | 'note' } | null>(null);
   const [notesEdit, setNotesEdit] = useState<{ eventId: string; field: string; value: string } | null>(null);
   const [fieldLinkEdit, setFieldLinkEdit] = useState<{ eventId: string; field: string; url: string } | null>(null);
@@ -62,6 +64,58 @@ export default function ExportPreview() {
     }));
   };
 
+  const handleEventAIUpdate = async (eventId: string, files: FileAttachment[]) => {
+    if (files.length === 0) return;
+    setParsingEventId(eventId);
+    try {
+      const { data, error } = await supabase.functions.invoke('parse-itinerary', {
+        body: {
+          files: files.map(f => ({ data: f.data, name: f.name, type: f.type })),
+        },
+      });
+      if (error) throw error;
+      
+      const parsedEvents = data.events || [];
+      if (parsedEvents.length > 0) {
+        const newInfo = parsedEvents[0];
+        const event = project.phase_2_itinerary.events.find(e => e.id === eventId);
+        if (!event) return;
+
+        const updates: Partial<ItineraryEvent> = { ...event };
+        
+        // Sparse Merge
+        if (!updates.title || updates.title === 'New Event' || updates.title === 'Untitled Event') {
+          if (newInfo.title) updates.title = newInfo.title;
+        }
+        
+        if (newInfo.date) updates.date = normalizeDate(newInfo.date);
+        if (newInfo.time && !updates.time) updates.time = newInfo.time;
+        if (newInfo.location && !updates.location) updates.location = newInfo.location;
+        if (newInfo.address && !updates.address) updates.address = newInfo.address;
+        if (newInfo.confirmationCode) updates.confirmationCode = newInfo.confirmationCode;
+        if (newInfo.flightNumber) updates.flightNumber = newInfo.flightNumber;
+        
+        if (newInfo.links && newInfo.links.length > 0) {
+          updates.links = [...(updates.links || []), ...newInfo.links];
+        }
+        
+        if (newInfo.notes) {
+          updates.notes = updates.notes ? `${updates.notes}\n---\n${newInfo.notes}` : newInfo.notes;
+        }
+
+        updateEvent(eventId, updates);
+        toast.success("Event updated with AI data from your document.");
+      } else {
+        toast.info("No event data found in that document.");
+      }
+    } catch (err) {
+      console.error("AI Update failed:", err);
+      toast.error("Could not update with AI.");
+    } finally {
+      setParsingEventId(null);
+    }
+  };
+
   const handleAIUpdate = async (eventId: string, files: FileAttachment[]) => {
     if (files.length === 0) return;
     setIsUpdatingAI(eventId);
@@ -79,36 +133,37 @@ export default function ExportPreview() {
         const event = project.phase_2_itinerary.events.find(e => e.id === eventId);
         if (!event) return;
 
-        const updates: Partial<ItineraryEvent> = {};
-        if (newInfo.title) updates.title = newInfo.title;
+        const updates: Partial<ItineraryEvent> = { ...event };
+        
+        // Sparse Merge
+        if (!updates.title || updates.title === 'New Event' || updates.title === 'Untitled Event') {
+          if (newInfo.title) updates.title = newInfo.title;
+        }
+        
         if (newInfo.date) updates.date = normalizeDate(newInfo.date);
         if (newInfo.endDate) updates.endDate = normalizeDate(newInfo.endDate);
-        if (newInfo.time) updates.time = newInfo.time;
-        if (newInfo.location) updates.location = newInfo.location;
-        if (newInfo.address) updates.address = newInfo.address;
+        if (newInfo.time && !updates.time) updates.time = newInfo.time;
+        if (newInfo.location && !updates.location) updates.location = newInfo.location;
+        if (newInfo.address && !updates.address) updates.address = newInfo.address;
         if (newInfo.confirmationCode) updates.confirmationCode = newInfo.confirmationCode;
         if (newInfo.flightNumber) updates.flightNumber = newInfo.flightNumber;
-        if (newInfo.departureLocation) updates.departureLocation = newInfo.departureLocation;
-        if (newInfo.departureTime) updates.departureTime = newInfo.departureTime;
-        if (newInfo.arrivalLocation) updates.arrivalLocation = newInfo.arrivalLocation;
-        if (newInfo.arrivalTime) updates.arrivalTime = newInfo.arrivalTime;
         
         if (newInfo.links && newInfo.links.length > 0) {
-          updates.links = [...(event.links || []), ...newInfo.links];
+          updates.links = [...(updates.links || []), ...newInfo.links];
         }
         
         if (newInfo.notes) {
-          updates.notes = event.notes ? `${event.notes}; ${newInfo.notes}` : newInfo.notes;
+          updates.notes = updates.notes ? `${updates.notes}\n---\n${newInfo.notes}` : newInfo.notes;
         }
 
         updateEvent(eventId, updates);
-        toast.success("Event updated with data from your document.");
+        toast.success("Details updated from document.");
       } else {
-        toast.info("No event data found in that document.");
+        toast.info("No data found in that document.");
       }
     } catch (err) {
       console.error("AI Update failed:", err);
-      toast.error("Could not update with AI.");
+      toast.error("Could not update.");
     } finally {
       setIsUpdatingAI(null);
     }
@@ -223,7 +278,7 @@ export default function ExportPreview() {
           if (data.section !== 'body') return;
           // Make Details column cells clickable
           if (data.column.index === 1 && detailUrls[data.row.index]) {
-            doc.link(data.cell.x, data.cell.y, data.cell.width, data.cell.height, { url: detailUrls[data.row.index] });
+            doc.link(data.cell.x, data.cell.y, data.cell.width, data.cell.height, { url: detailUrls[data.row.index], newWindow: true });
             // Draw text in blue to indicate it's a link
             doc.setTextColor(30, 90, 200);
             doc.setFontSize(8);
@@ -237,7 +292,7 @@ export default function ExportPreview() {
             let cy = data.cell.y + 2.5;
             linkUrls.forEach((url) => {
               if (url) {
-                doc.link(data.cell.x, cy - 1.5, data.cell.width, lineHeight, { url });
+                doc.link(data.cell.x, cy - 1.5, data.cell.width, lineHeight, { url, newWindow: true });
               }
               cy += lineHeight;
             });
@@ -346,33 +401,27 @@ export default function ExportPreview() {
             const eventContent = (
               <div className="mb-6">
                 <div className="flex items-center justify-between mb-2">
-                  <h3 className="font-bold text-base">{getEventTitle(event)}</h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-bold text-base">{getEventTitle(event)}</h3>
+                    {parsingEventId === event.id && (
+                      <span className="flex items-center gap-1 text-xs text-primary animate-pulse">
+                        <Loader2 className="h-3 w-3 animate-spin" /> Analyzing...
+                      </span>
+                    )}
+                  </div>
                   <Button
                     variant="ghost"
                     size="sm"
                     className="h-7 text-xs gap-1"
                     onClick={() => setEditingEvent(isEditing ? null : event.id)}
+                    disabled={!!parsingEventId}
                   >
                     {isEditing ? <><Check className="h-3 w-3" /> Done</> : <><Pencil className="h-3 w-3" /> Edit</>}
                   </Button>
                 </div>
 
-                {isEditing && (
-                  <div className="mb-4 p-3 bg-primary/5 border border-primary/20 rounded-lg flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-sm font-medium">
-                      <Sparkles className="h-4 w-4 text-primary" />
-                      Update details from a new document?
-                    </div>
-                    <FileDropZone 
-                      compact 
-                      onFilesAdded={(files) => handleAIUpdate(event.id, files)}
-                      disabled={!!isUpdatingAI}
-                    />
-                  </div>
-                )}
-                
                 {isUpdatingAI === event.id && (
-                  <div className="flex items-center justify-center gap-2 text-sm text-primary animate-pulse py-2 mb-2">
+                  <div className="flex items-center justify-center gap-2 text-sm text-primary animate-pulse py-2 mb-2 bg-primary/5 rounded border border-primary/10">
                     <Loader2 className="h-4 w-4 animate-spin" />
                     Analyzing document...
                   </div>
@@ -404,17 +453,34 @@ export default function ExportPreview() {
                             const fieldUrl = fieldKey && event.fieldUrls?.[fieldKey];
 
                             if (isEditing && notesEdit?.eventId === event.id && notesEdit.field === fieldKey) {
+                              const isNotes = fieldKey === 'notes';
                               return (
-                                <div className="flex gap-1">
-                                  <Input
-                                    className="h-7 text-xs"
-                                    value={notesEdit.value}
-                                    onChange={e => setNotesEdit({ ...notesEdit, value: e.target.value })}
-                                    onKeyDown={e => e.key === 'Enter' && saveNotesEdit()}
-                                  />
-                                  <Button size="sm" variant="ghost" className="h-7 px-2" onClick={saveNotesEdit}>
-                                    <Check className="h-3 w-3" />
-                                  </Button>
+                                <div className="flex flex-col gap-2">
+                                  {isNotes ? (
+                                    <Textarea
+                                      className="text-xs min-h-[80px]"
+                                      value={notesEdit.value}
+                                      onChange={e => setNotesEdit({ ...notesEdit, value: e.target.value })}
+                                      onKeyDown={e => e.key === 'Enter' && !e.shiftKey && saveNotesEdit()}
+                                      autoFocus
+                                    />
+                                  ) : (
+                                    <Input
+                                      className="h-7 text-xs"
+                                      value={notesEdit.value}
+                                      onChange={e => setNotesEdit({ ...notesEdit, value: e.target.value })}
+                                      onKeyDown={e => e.key === 'Enter' && saveNotesEdit()}
+                                      autoFocus
+                                    />
+                                  )}
+                                  <div className="flex gap-2">
+                                    <Button size="sm" className="h-7 px-2" onClick={saveNotesEdit}>
+                                      <Check className="h-3 w-3 mr-1" /> Save
+                                    </Button>
+                                    <Button size="sm" variant="ghost" className="h-7 px-2 text-muted-foreground" onClick={() => setNotesEdit(null)}>
+                                      Cancel
+                                    </Button>
+                                  </div>
                                 </div>
                               );
                             }
@@ -455,12 +521,14 @@ export default function ExportPreview() {
 
                             const isLocationField = ['Location', 'Departure', 'Arrival'].includes(row.field);
                             const effectiveUrl = fieldUrl || (isLocationField && row.details ? googleMapsUrl(row.details) : '');
+                            const isNotesField = row.field === 'Details';
+                            
                             const detailContent = effectiveUrl ? (
                               <a href={effectiveUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline inline-flex items-center gap-0.5">
                                 {row.details} <ExternalLink className="h-2.5 w-2.5 shrink-0" />
                               </a>
                             ) : (
-                              <span>{row.details}</span>
+                              <span className={isNotesField ? "whitespace-pre-wrap" : ""}>{row.details}</span>
                             );
 
                             if (!isEditing || !fieldKey) return detailContent;

@@ -45,6 +45,7 @@ export default function Phase2Itinerary() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<ItineraryEvent>>({});
   const [isParsing, setIsParsing] = useState(false);
+  const [parsingEventId, setParsingEventId] = useState<string | null>(null);
   const [previewEvents, setPreviewEvents] = useState<Partial<ItineraryEvent>[]>([]);
   const [uploadedDocs, setUploadedDocs] = useState<FileAttachment[]>([]);
 
@@ -240,6 +241,68 @@ export default function Phase2Itinerary() {
 
   const cancelEdit = () => { setEditingId(null); setEditForm({}); };
 
+  const handleEventAIUpdate = async (eventId: string, files: FileAttachment[]) => {
+    if (files.length === 0) return;
+    setParsingEventId(eventId);
+    try {
+      const { data, error } = await supabase.functions.invoke('parse-itinerary', {
+        body: {
+          files: files.map(f => ({ data: f.data, name: f.name, type: f.type })),
+        },
+      });
+      if (error) throw error;
+      
+      const parsedEvents = data.events || [];
+      if (parsedEvents.length > 0) {
+        // UseCase 2: If multiple events in doc, update the current card with the first one
+        const newInfo = parsedEvents[0];
+        
+        updateProject(projectId!, p => ({
+          ...p,
+          phase_2_itinerary: {
+            ...p.phase_2_itinerary,
+            events: p.phase_2_itinerary.events.map(e => {
+              if (e.id !== eventId) return e;
+              
+              const merged = { ...e };
+              // UseCase 1: Sparse Merge
+              // Only update title if it's currently generic
+              if (!merged.title || merged.title === 'New Event' || merged.title === 'Untitled Event') {
+                if (newInfo.title) merged.title = newInfo.title;
+              }
+              
+              if (newInfo.date) merged.date = normalizeDate(newInfo.date);
+              if (newInfo.time && !merged.time) merged.time = newInfo.time;
+              if (newInfo.location && !merged.location) merged.location = newInfo.location;
+              if (newInfo.address && !merged.address) merged.address = newInfo.address;
+              if (newInfo.confirmationCode) merged.confirmationCode = newInfo.confirmationCode;
+              if (newInfo.flightNumber) merged.flightNumber = newInfo.flightNumber;
+              
+              if (newInfo.links && newInfo.links.length > 0) {
+                merged.links = [...(merged.links || []), ...newInfo.links];
+              }
+              
+              // Only append to notes, never overwrite
+              if (newInfo.notes) {
+                merged.notes = merged.notes ? `${merged.notes}\n---\n${newInfo.notes}` : newInfo.notes;
+              }
+
+              return merged;
+            })
+          }
+        }));
+        toast.success("Event updated with AI data from your document.");
+      } else {
+        toast.info("No event data found in that document.");
+      }
+    } catch (err) {
+      console.error("AI Update failed:", err);
+      toast.error("Could not update with AI.");
+    } finally {
+      setParsingEventId(null);
+    }
+  };
+
   const hasMissing = (e: ItineraryEvent) => !e.time || e.links.length === 0;
 
   const addAttachments = (eventId: string, files: FileAttachment[]) => {
@@ -426,7 +489,15 @@ export default function Phase2Itinerary() {
                         )}
                       </div>
                       {ev.notes && (
-                        <Input className="h-7 text-xs" placeholder="Notes" value={ev.notes || ''} onChange={e => updatePreviewEvent(i, { notes: e.target.value })} />
+                        <div className="mt-2">
+                          <label className="text-[10px] uppercase font-bold text-muted-foreground block mb-1">Notes</label>
+                          <Textarea 
+                            className="text-xs min-h-[60px] resize-none" 
+                            placeholder="Add bullets or multi-line notes..." 
+                            value={ev.notes || ''} 
+                            onChange={e => updatePreviewEvent(i, { notes: e.target.value })} 
+                          />
+                        </div>
                       )}
                     </CardContent>
                   </Card>
@@ -459,7 +530,7 @@ export default function Phase2Itinerary() {
               const cardContent = (
                 <Card className="relative slide-up" style={{ animationDelay: `${i * 40}ms` }}>
                   <CardContent className="p-4">
-                    {isEditing && !isBookend ? (
+                    {isEditing ? (
                       <EditForm
                         form={editForm}
                         setForm={setEditForm}
@@ -483,11 +554,16 @@ export default function Phase2Itinerary() {
                             {isBookend && (
                               <span className="text-xs text-muted-foreground/60 italic">({event.title})</span>
                             )}
-                            {missing && (
+                            {parsingEventId === event.id && (
+                              <span className="flex items-center gap-1 text-xs text-primary animate-pulse">
+                                <Loader2 className="h-3 w-3 animate-spin" /> Analyzing...
+                              </span>
+                            )}
+                            {missing && !parsingEventId && (
                               <AlertTriangle className="h-3.5 w-3.5 text-warning" />
                             )}
                           </div>
-                          {!isBookend && <h4 className="font-semibold">{event.title}</h4>}
+                          {isBookend !== 'check-out' && <h4 className="font-semibold">{event.title}</h4>}
                           <div className="flex flex-wrap gap-3 mt-1 text-sm text-muted-foreground">
                             {event.type === 'flight' ? (
                               <>
@@ -516,21 +592,21 @@ export default function Phase2Itinerary() {
                               </>
                             )}
                           </div>
-                          {(event.flightNumber || event.confirmationCode) && (
+                          {(event.flightNumber || event.confirmationCode) && isBookend !== 'check-out' && (
                             <p className="text-xs mt-1 text-muted-foreground">
                               {event.flightNumber && <><span className="font-mono">{event.flightNumber}</span> · </>}
                               {event.confirmationCode && <>Conf: <span className="font-mono">{event.confirmationCode}</span></>}
                             </p>
                           )}
-                          {event.address && (
+                          {event.address && isBookend !== 'check-out' && (
                             <p className="text-xs mt-0.5 text-muted-foreground">📍 {event.address}</p>
                           )}
-                          {event.missingFields && event.missingFields.length > 0 && (
+                          {event.missingFields && event.missingFields.length > 0 && isBookend !== 'check-out' && (
                             <p className="text-xs mt-1 text-warning flex items-center gap-1">
                               <AlertTriangle className="h-3 w-3" /> Missing: {event.missingFields.join(', ')}
                             </p>
                           )}
-                          {event.links.length > 0 && (
+                          {event.links.length > 0 && isBookend !== 'check-out' && (
                             <div className="mt-2 space-y-1">
                               {event.links.map((link, li) => (
                                 <a
@@ -545,21 +621,17 @@ export default function Phase2Itinerary() {
                               ))}
                             </div>
                           )}
-                          {event.notes && <p className="text-xs mt-2 text-muted-foreground italic">{event.notes}</p>}
-                          <AttachmentList
-                            attachments={event.attachments || []}
-                            onRemove={(attId) => removeAttachment(event.id, attId)}
-                          />
+                          {event.notes && (
+                            <p className="text-xs mt-2 text-muted-foreground italic whitespace-pre-wrap border-l-2 border-muted pl-2 py-1 bg-muted/30 rounded-r">
+                              {event.notes}
+                            </p>
+                          )}
                         </div>
                         <div className="flex gap-1 shrink-0">
-                          <FileDropZone
-                            compact
-                            onFilesAdded={(files) => addAttachments(event.id, files)}
-                          />
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => startEdit(event)}>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => startEdit(event)} disabled={!!parsingEventId}>
                             <Pencil className="h-3.5 w-3.5" />
                           </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => deleteEvent(event.id)}>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => deleteEvent(event.id)} disabled={!!parsingEventId}>
                             <Trash2 className="h-3.5 w-3.5" />
                           </Button>
                         </div>
@@ -608,40 +680,37 @@ function EditForm({
       
       const parsedEvents = data.events || [];
       if (parsedEvents.length > 0) {
-        // Merge the first parsed event into the current form
         const newInfo = parsedEvents[0];
         const merged: Partial<ItineraryEvent> = { ...form };
         
-        // Only override if the AI found something new/specific
-        if (newInfo.title) merged.title = newInfo.title;
+        // Sparse Merge logic
+        if (!merged.title || merged.title === 'New Event' || merged.title === 'Untitled Event') {
+          if (newInfo.title) merged.title = newInfo.title;
+        }
         if (newInfo.date) merged.date = normalizeDate(newInfo.date);
         if (newInfo.endDate) merged.endDate = normalizeDate(newInfo.endDate);
-        if (newInfo.time) merged.time = newInfo.time;
-        if (newInfo.location) merged.location = newInfo.location;
-        if (newInfo.address) merged.address = newInfo.address;
+        if (newInfo.time && !merged.time) merged.time = newInfo.time;
+        if (newInfo.location && !merged.location) merged.location = newInfo.location;
+        if (newInfo.address && !merged.address) merged.address = newInfo.address;
         if (newInfo.confirmationCode) merged.confirmationCode = newInfo.confirmationCode;
         if (newInfo.flightNumber) merged.flightNumber = newInfo.flightNumber;
-        if (newInfo.departureLocation) merged.departureLocation = newInfo.departureLocation;
-        if (newInfo.departureTime) merged.departureTime = newInfo.departureTime;
-        if (newInfo.arrivalLocation) merged.arrivalLocation = newInfo.arrivalLocation;
-        if (newInfo.arrivalTime) merged.arrivalTime = newInfo.arrivalTime;
         
         if (newInfo.links && newInfo.links.length > 0) {
           merged.links = [...(merged.links || []), ...newInfo.links];
         }
         
         if (newInfo.notes) {
-          merged.notes = merged.notes ? `${merged.notes}; ${newInfo.notes}` : newInfo.notes;
+          merged.notes = merged.notes ? `${merged.notes}\n---\n${newInfo.notes}` : newInfo.notes;
         }
 
         setForm(merged);
-        toast.success("Event updated with data from your document.");
+        toast.success("Details updated from document.");
       } else {
-        toast.info("No event data found in that document.");
+        toast.info("No data found in that document.");
       }
     } catch (err) {
       console.error("AI Update failed:", err);
-      toast.error("Could not update with AI.");
+      toast.error("Could not update.");
     } finally {
       setIsUpdating(false);
     }
@@ -663,19 +732,8 @@ function EditForm({
 
   return (
     <div className="space-y-4">
-      <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg flex items-center justify-between">
-        <div className="flex items-center gap-2 text-sm font-medium">
-          <Sparkles className="h-4 w-4 text-primary" />
-          Update details from a new document?
-        </div>
-        <FileDropZone 
-          compact 
-          onFilesAdded={updateWithAI}
-          disabled={isUpdating}
-        />
-      </div>
       {isUpdating && (
-        <div className="flex items-center justify-center gap-2 text-sm text-primary animate-pulse py-2">
+        <div className="flex items-center justify-center gap-2 text-sm text-primary animate-pulse py-2 bg-primary/5 border border-primary/20 rounded-lg">
           <Loader2 className="h-4 w-4 animate-spin" />
           Analyzing document...
         </div>
@@ -756,7 +814,12 @@ function EditForm({
       </div>
       <div>
         <label className="text-xs font-medium text-muted-foreground">Notes</label>
-        <Input value={form.notes || ''} onChange={e => setForm({ ...form, notes: e.target.value })} />
+        <Textarea 
+          value={form.notes || ''} 
+          onChange={e => setForm({ ...form, notes: e.target.value })} 
+          placeholder="Add details, bullets, or multi-line notes..."
+          className="min-h-[100px]"
+        />
       </div>
       <div>
         <div className="flex items-center justify-between mb-1">
@@ -776,21 +839,19 @@ function EditForm({
         ))}
       </div>
       <div>
-        <label className="text-xs font-medium text-muted-foreground">Attachments</label>
+        <label className="text-xs font-medium text-muted-foreground">Update from Document</label>
         <div className="mt-1">
-          <FileDropZone onFilesAdded={(files) => {
-            setForm({ ...form, attachments: [...(form.attachments || []), ...files] });
-          }} />
+          <FileDropZone 
+            onFilesAdded={updateWithAI}
+            disabled={isUpdating}
+          />
         </div>
-        <AttachmentList
-          attachments={form.attachments || []}
-          onRemove={(attId) => {
-            setForm({ ...form, attachments: (form.attachments || []).filter(a => a.id !== attId) });
-          }}
-        />
+        <p className="text-[10px] text-muted-foreground mt-1">
+          Drop a PDF or image here to automatically extract details into this activity.
+        </p>
       </div>
-      <div className="flex gap-2">
-        <Button size="sm" onClick={onSave} className="gap-1"><Save className="h-3 w-3" /> Save</Button>
+      <div className="flex gap-2 pt-2 border-t mt-4">
+        <Button size="sm" onClick={onSave} className="gap-1"><Save className="h-3 w-3" /> Save Changes</Button>
         <Button size="sm" variant="outline" onClick={onCancel}><X className="h-3 w-3" /> Cancel</Button>
       </div>
     </div>

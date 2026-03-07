@@ -20,7 +20,12 @@
 ---
 
 ## 2. Session Initialization
-Every AI session MUST start by reading this file and `PROJECT_ROADMAP.md`. This ensures alignment on the current project state and task ownership.
+Every AI session MUST start by:
+1.  Reading this file and `PROJECT_ROADMAP.md`.
+2.  Checking the Supabase `projects` table for a row with `project_id = 'voc_requests'`.
+3.  If new entries exist in the `data.requests` array (`status = 'new'`), summarize them and add them to the `## 🗣️ VoC Requests` section in `PROJECT_ROADMAP.md`.
+4.  Update the `status` of these entries to `'synced'` in the `projects` table.
+5.  This ensures user feedback is always integrated into the development cycle.
 
 ## 3. Planning Mode (The "Brainstorm-Plan-Execute" Cycle)
 For any significant task (marked with `[Planning Required]` in the roadmap):

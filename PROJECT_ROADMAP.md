@@ -1,26 +1,36 @@
-# Project Roadmap: Bugs & Features
+# Project Roadmap & AI Task Board
 
-This file tracks the evolution of the **Itinerary Wizard**. It is the primary source of truth for pending work and historical fixes.
+This file tracks the status of work and is the shared task board for **Gemini (♊)** and **Claude (🤖)**.
+See **AI_WOW.md** for interaction protocols and rules of engagement.
 
 ---
 
-## 🚀 Feature Requests & Enhancements
-| Status | Feature | Description |
-| :--- | :--- | :--- |
-| 🟢 Done | Checklist Refinement | Allow users to add/change/delete checklist items via AI in Phase 1. |
-| 🟡 Pending | *New Feature* | *Add your requests here...* |
+## 🏎️ Active Pipelines (High Priority)
+
+| ID | Task | Pipeline Status | Current Owner |
+| :--- | :--- | :--- | :--- |
+| **F1** | **User-Scoped Trips (Email Identity)** [Planning Required] | `[ ] ♊ Gemini (Schema & Hooks)` ➡️ `[ ] 🤖 Claude (UI Refactor)` ➡️ `[ ] ♊ Gemini (Migration)` | **♊ Gemini** |
+
+---
+
+## 🚀 Feature Backlog
+| ID | Feature | Description | Target Agent |
+| :--- | :--- | :--- | :--- |
+| **F2** | **PDF Export Styles** | Enhance the visual layout of the PDF export for itineraries. | 🤖 Claude |
 
 ---
 
 ## 🔴 Active Bugs
-*No active bugs reported.*
+| ID | Issue | Description | Current Owner |
+| :--- | :--- | :--- | :--- |
+| **B1** | **Meta Tag Cleanup** | Update index.html title and OG tags. | ♊ Gemini |
 
 ---
 
-## 🟢 Resolved Bugs
-| Date | Issue | Resolution |
-| :--- | :--- | :--- |
-| 2026-03-06 | Checklist refinement missing | Added AI-driven checklist updates to Phase 1 Interview. |
+## 🟢 Resolved (History)
+| Date | ID | Task | Resolution |
+| :--- | :--- | :--- | :--- |
+| 2026-03-06 | - | Checklist refinement | AI updates for Phase 1 Interview. |
 
 ---
-*Note: Gemini will check this file at the start of every task to align with user priorities.*
+*Note: This file is the primary coordination point for Gemini and Claude. Please maintain the structure for automated parsing.*

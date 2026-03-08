@@ -29,7 +29,7 @@ export function EmailPrompt({ open, onSubmit }: EmailPromptProps) {
         <DialogHeader>
           <div className="flex items-center gap-2 mb-2">
             <Palmtree className="h-6 w-6 text-primary" />
-            <DialogTitle className="text-xl">Welcome to TravelArchitect</DialogTitle>
+            <DialogTitle className="text-xl">Itinerary Wizard</DialogTitle>
           </div>
           <DialogDescription>
             Enter your email to get started. Your trips will be saved to this identity.

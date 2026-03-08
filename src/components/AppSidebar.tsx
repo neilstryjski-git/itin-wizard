@@ -37,7 +37,7 @@ export function AppSidebar() {
           <Palmtree className="h-6 w-6 text-sidebar-primary" />
           {!collapsed && (
             <span className="font-heading text-lg font-bold text-sidebar-foreground">
-              TravelArchitect
+              Itinerary Wizard
             </span>
           )}
         </div>
@@ -90,18 +90,25 @@ export function AppSidebar() {
       </SidebarContent>
 
       {email && (
-        <SidebarFooter className="p-3 border-t">
-          <div className="flex items-center gap-2 min-w-0">
-            <Mail className="h-4 w-4 shrink-0 text-muted-foreground" />
-            {!collapsed && (
-              <span className="text-xs text-muted-foreground truncate flex-1">{email}</span>
-            )}
-            {!collapsed && (
-              <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={clearEmail} title="Switch identity">
-                <LogOut className="h-3 w-3" />
-              </Button>
-            )}
-          </div>
+        <SidebarFooter className="p-2 border-t mt-auto">
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                size="lg"
+                className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+                onClick={clearEmail}
+                title={`Logout ${email}`}
+              >
+                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
+                  <LogOut className="size-4" />
+                </div>
+                <div className="grid flex-1 text-left text-sm leading-tight">
+                  <span className="truncate font-semibold">Logout</span>
+                  <span className="truncate text-xs">{email}</span>
+                </div>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
         </SidebarFooter>
       )}
     </Sidebar>

@@ -28,11 +28,11 @@ export function useProjects(email: string | null) {
       if (ownedErr) throw ownedErr;
 
       // 2. Fetch projects where user is a collaborator
-      // We use the JSONB containment filter directly
+      // Using verified path-based containment filter
       const { data: shared, error: sharedErr } = await supabase
         .from('projects')
         .select('*')
-        .contains('data', { metadata: { collaborators: [normalizedEmail] } });
+        .filter('data->metadata->collaborators', 'cs', `["${normalizedEmail}"]`);
 
       if (sharedErr) throw sharedErr;
 

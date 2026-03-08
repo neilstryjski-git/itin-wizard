@@ -19,45 +19,17 @@ export function useProjects(email: string | null) {
       if (!email) return [];
       const normalizedEmail = email.trim().toLowerCase();
       
-      // 1. Fetch projects where user is owner
-      const { data: owned, error: ownedErr } = await supabase
+      // Fetch projects where user is owner OR user is in the collaborators list
+      // Using PostgREST 'or' with JSONB containment filter
+      const { data, error } = await supabase
         .from('projects')
         .select('*')
-        .eq('owner_email', normalizedEmail)
+        .or(`owner_email.eq.${normalizedEmail},data->metadata->collaborators.cs.["${normalizedEmail}"]`)
         .order('created_at', { ascending: false });
       
-      if (ownedErr) throw ownedErr;
+      if (error) throw error;
 
-      // 2. Fetch projects where user is a collaborator
-      const { data: collabIds, error: collabErr } = await supabase
-        .from('project_collaborators')
-        .select('project_id')
-        .eq('user_email', normalizedEmail);
-
-      let shared: any[] = [];
-      // If table doesn't exist (PGRST205), just ignore sharing for now
-      if (collabErr && (collabErr as any).code !== 'PGRST205') {
-        throw collabErr;
-      }
-
-      if (!collabErr && collabIds && collabIds.length > 0) {
-        const ids = collabIds.map(c => c.project_id);
-        const { data, error: sharedErr } = await supabase
-          .from('projects')
-          .select('*')
-          .in('project_id', ids);
-
-        if (sharedErr) throw sharedErr;
-        shared = data || [];
-      }
-
-
-      // 3. Combine and map
-      const allRows = [...(owned || []), ...shared];
-      // Deduplicate by project_id just in case
-      const uniqueRows = Array.from(new Map(allRows.map(r => [r.project_id, r])).values());
-      
-      return uniqueRows.map(row => ({
+      return (data || []).map(row => ({
         ...(row.data as unknown as TravelProject),
         owner_email: row.owner_email // Inject owner info for UI checks
       }));
@@ -135,19 +107,6 @@ export function useProjects(email: string | null) {
         .update({ data: JSON.parse(JSON.stringify(updated)) })
         .eq('project_id', projectId);
       if (error) throw error;
-
-      // Handle collaborators sync
-      if (updated.metadata.collaborators) {
-        // Simple approach: Delete all and re-insert (fine for small lists)
-        await supabase.from('project_collaborators').delete().eq('project_id', projectId);
-        if (updated.metadata.collaborators.length > 0) {
-          const inserts = updated.metadata.collaborators.map(c_email => ({
-            project_id: projectId,
-            user_email: c_email.trim().toLowerCase()
-          }));
-          await supabase.from('project_collaborators').insert(inserts);
-        }
-      }
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: projectsQueryKey(email!) }),
   });

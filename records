@@ -1,0 +1,7 @@
+type,host,answer,ttl,priority
+A,productdelivered.ca,76.76.21.21,600 
+ALIAS,www.productdelivered.ca,32741a363a8128ad.vercel-dns-017.com.,600 
+MX,productdelivered.ca,fwd1.porkbun.com,600,10 
+MX,productdelivered.ca,fwd2.porkbun.com,600,20 
+TXT,productdelivered.ca,v=spf1 include:_spf.porkbun.com ~all,600 
+TXT,_lovable.productdelivered.ca,lovable_verify=d49a4d30437273ef9a0395772d09b042da977036daa0c9d51936b5189de6316c,300

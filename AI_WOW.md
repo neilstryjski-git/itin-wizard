@@ -1,4 +1,4 @@
-# AI Way of Working (WoW) - Itinerary Wizard
+# AI Way of Working (WoW) - Trip Wizard
 
 ## ⚙️ Runtime Configuration
 > **Active Agents:** `[ ♊ Gemini ]` (Single Agent Mode)

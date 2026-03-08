@@ -19,8 +19,8 @@ export default defineConfig(({ mode }) => ({
       registerType: "autoUpdate",
       includeAssets: ["favicon.ico", "robots.txt", "placeholder.svg"],
       manifest: {
-        name: "Itinerary Wizard",
-        short_name: "ItinWizard",
+        name: "Trip Wizard",
+        short_name: "TripWizard",
         description: "Automate your travel planning with AI.",
         theme_color: "#ffffff",
         icons: [

@@ -37,7 +37,7 @@ export function AppSidebar() {
           <Palmtree className="h-6 w-6 text-sidebar-primary" />
           {!collapsed && (
             <span className="font-heading text-lg font-bold text-sidebar-foreground">
-              Itinerary Wizard
+              Trip Wizard
             </span>
           )}
         </div>

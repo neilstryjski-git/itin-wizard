@@ -105,7 +105,7 @@ export default function Roadmap() {
     <div className="p-6 md:p-10 max-w-4xl mx-auto space-y-10 fade-in">
       <header className="space-y-2">
         <h1 className="text-4xl font-heading font-bold tracking-tight">Project Roadmap</h1>
-        <p className="text-xl text-muted-foreground">The future of Itinerary Wizard, synced from our core development board.</p>
+        <p className="text-xl text-muted-foreground">The future of Trip Wizard, synced from our core development board.</p>
       </header>
 
       <section className="space-y-6">
@@ -203,7 +203,7 @@ export default function Roadmap() {
       <footer className="text-center py-10 opacity-40 hover:opacity-100 transition-opacity">
         <div className="flex items-center justify-center gap-2 text-sm">
           <CheckCircle2 className="h-4 w-4" />
-          <span>Itinerary Wizard Project Source of Truth</span>
+          <span>Trip Wizard Project Source of Truth</span>
         </div>
       </footer>
     </div>

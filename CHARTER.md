@@ -25,3 +25,16 @@ Traditional travel planning is plagued by three major frictions:
 *   **Real-Time Flight Tracking**: We do not currently provide live gate-change notifications or flight delay alerts (though links to airline trackers are included).
 *   **Social Networking**: This is a utility for private groups, not a public platform for sharing itineraries with the general public.
 *   **Expense Tracking**: While notes can store costs, a dedicated multi-currency expense management system is not part of the core mission.
+
+## 🛠️ AI-First Development Lifecycle (WoW)
+Trip Wizard is developed through a pioneering collaboration between **Gemini (The Architect)** and **Claude (The Builder)**. This partnership utilizes an orchestration layer to manage complex engineering tasks:
+
+*   **Gemini (The Architect)**: Orchestrates the overall system design, manages backend logic, and ensures long-term architectural integrity.
+*   **Claude Code (The Builder)**: Employs high-speed, high-accuracy React implementation and UI/UX polishing. We plan to integrate **Claude Code CLI** to enable deep, cross-agent collaboration where Gemini and Claude can "pass the baton" autonomously.
+*   **Orchestration Logic**: All development is guided by **AI_WOW.md** (Way of Working) and **PROJECT_ROADMAP.md**, which act as the collective intelligence and shared task board for the agents.
+
+## 🏗️ Technical Architecture
+*   **Local Linux Sandbox**: The core development environment is a specialized Linux sandbox, allowing for secure, isolated AI tool execution and validation.
+*   **GitHub**: Centralized source control and PR-based workflows for code auditing and versioning.
+*   **Vercel**: Frontend hosting and CI/CD, providing a global edge network for the PWA.
+*   **Supabase**: Cloud-native Postgres database, Auth (Email-as-Identity), and Edge Functions for AI document parsing.

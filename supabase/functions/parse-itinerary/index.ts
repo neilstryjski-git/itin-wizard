@@ -8,7 +8,13 @@ const corsHeaders = {
 
 const systemPrompt = `You are a travel itinerary parser. Given raw reservation/booking text and/or document images, extract structured events.
 
-Return a JSON array of events. Each event object has these fields:
+Additionally, provide a high-level "summary" of the whole trip. This should include:
+- A "notes" section summarizing the overall trip (e.g., duration, main destination, key theme like "Honeymoon" or "Business Trip", or important trip-wide reminders found in the documents).
+- A "links" section for any useful resources mentioned that apply to the whole trip rather than a specific event (e.g., general travel insurance, destination guides, or shared cloud folder links).
+
+Return a JSON object containing an "events" array and an optional "summary" object.
+
+Each event object has these fields:
 - type: one of "flight", "accommodation", "activity", "transfer"
 - title: short descriptive title (for flights use "Origin → Destination" format, e.g. "Toronto → Belize City")
 - date: ISO date string YYYY-MM-DD (departure date for flights, check-in for accommodation)
@@ -36,11 +42,29 @@ Rules:
 const toolDef = {
   type: "function",
   function: {
-    name: "return_parsed_events",
-    description: "Return the parsed itinerary events as structured data.",
+    name: "return_parsed_itinerary",
+    description: "Return the parsed itinerary events and a trip summary as structured data.",
     parameters: {
       type: "object",
       properties: {
+        summary: {
+          type: "object",
+          properties: {
+            notes: { type: "string", description: "A high-level overview or trip-wide notes extracted from the documents." },
+            links: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  label: { type: "string" },
+                  url: { type: "string" },
+                },
+                required: ["label", "url"],
+              },
+              description: "Trip-wide links/resources.",
+            },
+          },
+        },
         events: {
           type: "array",
           items: {
@@ -153,7 +177,7 @@ serve(async (req) => {
           { role: "user", content: userContent },
         ],
         tools: [toolDef],
-        tool_choice: { type: "function", function: { name: "return_parsed_events" } },
+        tool_choice: { type: "function", function: { name: "return_parsed_itinerary" } },
       }),
     });
 

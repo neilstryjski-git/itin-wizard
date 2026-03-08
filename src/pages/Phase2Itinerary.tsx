@@ -17,6 +17,7 @@ import { FileDropZone, AttachmentList } from '@/components/FileDropZone';
 import { supabase } from '@/integrations/supabase/client';
 import { buildTimeline, normalizeDate, eventsFromTimeline, TimelineEntry } from '@/lib/itinerary-utils';
 import { SortableList, SortableItem, arrayMove } from '@/components/SortableEventList';
+import { CollaboratorsDialog } from '@/components/CollaboratorsDialog';
 
 const EVENT_ICONS: Record<string, any> = {
   'flight': Plane,
@@ -38,15 +39,56 @@ const EVENT_LABELS: Record<string, string> = {
 
 export default function Phase2Itinerary() {
   const { projectId } = useParams<{ projectId: string }>();
-  const { getProject, updateProject } = useProjectsContext();
+  const { getProject, updateProject, email } = useProjectsContext();
   const navigate = useNavigate();
   const project = getProject(projectId!);
+  const isOwner = project?.owner_email?.trim().toLowerCase() === email?.trim().toLowerCase();
   const [rawInput, setRawInput] = useState(project?.phase_2_itinerary.rawInput || '');
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingSummary, setEditingSummary] = useState(false);
   const [editForm, setEditForm] = useState<Partial<ItineraryEvent>>({});
+  const [summaryForm, setSummaryForm] = useState<{ notes: string; links: TravelLink[] }>({ notes: '', links: [] });
   const [isParsing, setIsParsing] = useState(false);
+
+  const startEditSummary = () => {
+    setSummaryForm({
+      notes: project?.phase_2_itinerary.summary?.notes || '',
+      links: [...(project?.phase_2_itinerary.summary?.links || [])],
+    });
+    setEditingSummary(true);
+  };
+
+  const saveSummaryEdit = () => {
+    updateProject(projectId!, p => ({
+      ...p,
+      phase_2_itinerary: {
+        ...p.phase_2_itinerary,
+        summary: summaryForm,
+      },
+    }));
+    setEditingSummary(false);
+  };
+
+  const cancelSummaryEdit = () => {
+    setEditingSummary(false);
+  };
+
+  const addSummaryLink = () => {
+    setSummaryForm(prev => ({ ...prev, links: [...prev.links, { label: '', url: '' }] }));
+  };
+
+  const updateSummaryLink = (i: number, field: keyof TravelLink, value: string) => {
+    const links = [...summaryForm.links];
+    links[i] = { ...links[i], [field]: value };
+    setSummaryForm(prev => ({ ...prev, links }));
+  };
+
+  const removeSummaryLink = (i: number) => {
+    setSummaryForm(prev => ({ ...prev, links: prev.links.filter((_, idx) => idx !== i) }));
+  };
   const [parsingEventId, setParsingEventId] = useState<string | null>(null);
   const [previewEvents, setPreviewEvents] = useState<Partial<ItineraryEvent>[]>([]);
+  const [previewSummary, setPreviewSummary] = useState<{ notes: string; links: TravelLink[] } | null>(null);
   const [uploadedDocs, setUploadedDocs] = useState<FileAttachment[]>([]);
 
   const handleDocsAdded = useCallback((files: FileAttachment[]) => {
@@ -79,7 +121,10 @@ export default function Phase2Itinerary() {
         id: crypto.randomUUID(),
         links: ev.links || [],
       }));
-      if (events.length === 0) {
+      if (data.summary) {
+        setPreviewSummary(data.summary);
+      }
+      if (events.length === 0 && !data.summary) {
         toast.info('No events could be extracted. Try adding more detail.');
         if (rawInput.trim()) {
           const fallback = parseRawInput(rawInput);
@@ -164,15 +209,21 @@ export default function Phase2Itinerary() {
         const timeB = b.type === 'flight' ? (b.departureTime || '') : (b.time || '');
         return timeA.localeCompare(timeB);
       });
+      
+      const newSummary = previewSummary || p.phase_2_itinerary.summary;
+
       return {
         ...p,
         phase_2_itinerary: {
+          ...p.phase_2_itinerary,
           rawInput,
           events: allEvents,
+          summary: newSummary,
         },
       };
     });
     setPreviewEvents([]);
+    setPreviewSummary(null);
     setUploadedDocs([]);
     setRawInput('');
     toast.success(`${eventsToAdd.length} event(s) added to itinerary.`);
@@ -180,6 +231,7 @@ export default function Phase2Itinerary() {
 
   const cancelPreview = () => {
     setPreviewEvents([]);
+    setPreviewSummary(null);
   };
 
   const updatePreviewEvent = (index: number, updates: Partial<ItineraryEvent>) => {
@@ -334,9 +386,17 @@ export default function Phase2Itinerary() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h2 className="font-heading text-2xl font-bold">Itinerary</h2>
-          <p className="text-sm text-muted-foreground">{project.metadata.name || 'Untitled Trip'}</p>
+          <div className="flex items-center gap-2">
+            <p className="text-sm text-muted-foreground">{project.metadata.name || 'Untitled Trip'}</p>
+            {!isOwner && (
+               <span className="text-[10px] uppercase font-bold text-primary px-1.5 py-0.5 bg-primary/10 border border-primary/20 rounded">Shared</span>
+            )}
+          </div>
         </div>
         <div className="flex gap-2">
+          {isOwner && (
+            <CollaboratorsDialog project={project} />
+          )}
           <Button variant="outline" size="sm" onClick={addBlankEvent} className="gap-1">
             <Plus className="h-3 w-3" /> Add Event
           </Button>
@@ -435,6 +495,71 @@ export default function Phase2Itinerary() {
                 </Button>
               </div>
             </div>
+            
+            {previewSummary && (
+              <div className="space-y-3 pt-4 border-t border-primary/20">
+                <div className="flex items-center gap-2 text-sm font-semibold text-primary">
+                  <Sparkles className="h-4 w-4" />
+                  Trip Summary
+                </div>
+                <div className="bg-background rounded-md p-3 border border-primary/10">
+                  <label className="text-[10px] uppercase font-bold text-muted-foreground block mb-1">Notes</label>
+                  <Textarea
+                    className="text-xs min-h-[80px] mb-3"
+                    value={previewSummary.notes}
+                    onChange={e => setPreviewSummary({ ...previewSummary, notes: e.target.value })}
+                  />
+                  
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-[10px] uppercase font-bold text-muted-foreground">Links</label>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-5 text-[10px] gap-1"
+                      onClick={() => setPreviewSummary({ ...previewSummary, links: [...previewSummary.links, { label: '', url: '' }] })}
+                    >
+                      <Plus className="h-2 w-2" /> Add Link
+                    </Button>
+                  </div>
+                  {previewSummary.links.map((link, i) => (
+                    <div key={i} className="flex gap-2 mb-1">
+                      <Input 
+                        placeholder="Label" 
+                        value={link.label} 
+                        onChange={e => {
+                          const links = [...previewSummary.links];
+                          links[i].label = e.target.value;
+                          setPreviewSummary({ ...previewSummary, links });
+                        }} 
+                        className="h-7 text-xs flex-1" 
+                      />
+                      <Input 
+                        placeholder="URL" 
+                        value={link.url} 
+                        onChange={e => {
+                          const links = [...previewSummary.links];
+                          links[i].url = e.target.value;
+                          setPreviewSummary({ ...previewSummary, links });
+                        }} 
+                        className="h-7 text-xs flex-1" 
+                      />
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-7 w-7 text-destructive shrink-0" 
+                        onClick={() => {
+                          const links = previewSummary.links.filter((_, idx) => idx !== i);
+                          setPreviewSummary({ ...previewSummary, links });
+                        }}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="space-y-3">
               {previewEvents.map((ev, i) => {
                 const Icon = EVENT_ICONS[ev.type || 'activity'] || MapPin;
@@ -510,6 +635,91 @@ export default function Phase2Itinerary() {
 
       {/* Timeline */}
       <div className="space-y-3">
+        {/* Trip Summary Card */}
+        <Card className="border-primary/20 bg-primary/5">
+          <CardContent className="p-4">
+            {editingSummary ? (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-semibold text-sm">Trip Summary</h4>
+                  <div className="flex gap-2">
+                    <Button size="sm" onClick={saveSummaryEdit} className="h-8 gap-1">
+                      <Save className="h-3 w-3" /> Save
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={cancelSummaryEdit} className="h-8 gap-1">
+                      <X className="h-3 w-3" /> Cancel
+                    </Button>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground">General Trip Notes</label>
+                  <Textarea
+                    value={summaryForm.notes}
+                    onChange={e => setSummaryForm(prev => ({ ...prev, notes: e.target.value }))}
+                    placeholder="General info, packing reminders, or shared documents for the whole trip..."
+                    className="min-h-[100px] mt-1"
+                  />
+                </div>
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs font-medium text-muted-foreground">Trip-wide Links</label>
+                    <Button variant="ghost" size="sm" onClick={addSummaryLink} className="h-6 text-xs gap-1">
+                      <Plus className="h-3 w-3" /> Add Link
+                    </Button>
+                  </div>
+                  {summaryForm.links.map((link, i) => (
+                    <div key={i} className="flex gap-2 mb-1">
+                      <Input placeholder="Label" value={link.label} onChange={e => updateSummaryLink(i, 'label', e.target.value)} className="h-8 text-sm flex-1" />
+                      <Input placeholder="URL" value={link.url} onChange={e => updateSummaryLink(i, 'url', e.target.value)} className="h-8 text-sm flex-1" />
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive shrink-0" onClick={() => removeSummaryLink(i)}>
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="flex gap-3">
+                <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 bg-primary/10 text-primary">
+                  <Sparkles className="h-5 w-5" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                      Trip Summary
+                    </span>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={startEditSummary}>
+                      <Pencil className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                  {project.phase_2_itinerary.summary?.notes ? (
+                    <p className="text-sm text-muted-foreground whitespace-pre-wrap border-l-2 border-primary/20 pl-2 py-1 bg-primary/5 rounded-r">
+                      {project.phase_2_itinerary.summary.notes}
+                    </p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground italic">Add trip-wide notes, links, or resources here.</p>
+                  )}
+                  {project.phase_2_itinerary.summary?.links && project.phase_2_itinerary.summary.links.length > 0 && (
+                    <div className="mt-2 space-y-1">
+                      {project.phase_2_itinerary.summary.links.map((link, li) => (
+                        <a
+                          key={li}
+                          href={link.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1 text-xs text-primary hover:underline"
+                        >
+                          <LinkIcon className="h-3 w-3" /> {link.label}
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         {timelineEntries.length === 0 ? (
           <p className="text-center text-muted-foreground py-12">
             No events yet. Paste reservation data above or add events manually.

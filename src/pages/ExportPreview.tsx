@@ -33,6 +33,27 @@ export default function ExportPreview() {
   const [linkForm, setLinkForm] = useState<{ eventId: string; label: string; url: string; mode: 'link' | 'note' } | null>(null);
   const [notesEdit, setNotesEdit] = useState<{ eventId: string; field: string; value: string } | null>(null);
   const [fieldLinkEdit, setFieldLinkEdit] = useState<{ eventId: string; field: string; url: string } | null>(null);
+  const [editingSummary, setEditingSummary] = useState(false);
+  const [summaryForm, setSummaryForm] = useState<{ notes: string; links: TravelLink[] }>({ notes: '', links: [] });
+
+  const startEditSummary = () => {
+    setSummaryForm({
+      notes: project?.phase_2_itinerary.summary?.notes || '',
+      links: [...(project?.phase_2_itinerary.summary?.links || [])],
+    });
+    setEditingSummary(true);
+  };
+
+  const saveSummaryEdit = () => {
+    updateProject(projectId!, p => ({
+      ...p,
+      phase_2_itinerary: {
+        ...p.phase_2_itinerary,
+        summary: summaryForm,
+      },
+    }));
+    setEditingSummary(false);
+  };
 
   const reorderEntries = useCallback((oldIndex: number, newIndex: number) => {
     updateProject(projectId!, p => {
@@ -223,6 +244,37 @@ export default function ExportPreview() {
       y += 8;
     }
 
+    if (project.phase_2_itinerary.summary && (project.phase_2_itinerary.summary.notes || project.phase_2_itinerary.summary.links.length > 0)) {
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Trip Summary & Resources:', margin, y);
+      y += 5;
+
+      if (project.phase_2_itinerary.summary.notes) {
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'italic');
+        const splitNotes = doc.splitTextToSize(project.phase_2_itinerary.summary.notes, pageWidth - margin * 2);
+        doc.text(splitNotes, margin, y);
+        y += (splitNotes.length * 4) + 2;
+      }
+
+      if (project.phase_2_itinerary.summary.links.length > 0) {
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'normal');
+        project.phase_2_itinerary.summary.links.forEach(link => {
+          if (y > 270) { doc.addPage(); y = 15; }
+          const linkText = `• ${link.label}${link.url ? `: ${link.url}` : ''}`;
+          const splitLink = doc.splitTextToSize(linkText, pageWidth - margin * 2);
+          doc.text(splitLink, margin, y);
+          if (link.url) {
+            doc.link(margin, y - 3, pageWidth - margin * 2, 4, { url: link.url });
+          }
+          y += (splitLink.length * 4);
+        });
+        y += 4;
+      }
+    }
+
     doc.setDrawColor(180);
     doc.line(margin, y, pageWidth - margin, y);
     y += 6;
@@ -384,6 +436,94 @@ export default function ExportPreview() {
             {formatDate(project.metadata.startDate)} – {project.metadata.endDate ? formatDate(project.metadata.endDate) : 'TBD'}
           </div>
         )}
+
+        {/* Trip Summary Section */}
+        <div className="mt-4 pt-4 border-t border-border group">
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+              <Sparkles className="h-3.5 w-3.5" /> Trip Summary & Resources
+            </h2>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 text-xs gap-1"
+              onClick={() => editingSummary ? saveSummaryEdit() : startEditSummary()}
+            >
+              {editingSummary ? <><Check className="h-3.5 w-3.5" /> Done</> : <><Pencil className="h-3.5 w-3.5" /> Edit</>}
+            </Button>
+          </div>
+
+          {editingSummary ? (
+            <div className="space-y-4 bg-muted/30 p-4 rounded-lg border border-border">
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">General Trip Notes</label>
+                <Textarea
+                  value={summaryForm.notes}
+                  onChange={e => setSummaryForm(prev => ({ ...prev, notes: e.target.value }))}
+                  placeholder="General info, packing reminders, or shared documents..."
+                  className="min-h-[100px] mt-1 text-sm bg-background"
+                />
+              </div>
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-medium text-muted-foreground">Trip-wide Links</label>
+                  <Button variant="ghost" size="sm" onClick={() => setSummaryForm(prev => ({ ...prev, links: [...prev.links, { label: '', url: '' }] }))} className="h-6 text-xs gap-1">
+                    <Plus className="h-3 w-3" /> Add Link
+                  </Button>
+                </div>
+                {summaryForm.links.map((link, i) => (
+                  <div key={i} className="flex gap-2 mb-1">
+                    <Input placeholder="Label" value={link.label} onChange={e => {
+                      const links = [...summaryForm.links];
+                      links[i].label = e.target.value;
+                      setSummaryForm(prev => ({ ...prev, links }));
+                    }} className="h-8 text-sm flex-1 bg-background" />
+                    <Input placeholder="URL" value={link.url} onChange={e => {
+                      const links = [...summaryForm.links];
+                      links[i].url = e.target.value;
+                      setSummaryForm(prev => ({ ...prev, links }));
+                    }} className="h-8 text-sm flex-1 bg-background" />
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive shrink-0" onClick={() => {
+                      const links = summaryForm.links.filter((_, idx) => idx !== i);
+                      setSummaryForm(prev => ({ ...prev, links }));
+                    }}>
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+              <div className="flex gap-2 justify-end">
+                <Button size="sm" variant="outline" onClick={() => setEditingSummary(false)}>Cancel</Button>
+                <Button size="sm" onClick={saveSummaryEdit}>Save Summary</Button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {project.phase_2_itinerary.summary?.notes ? (
+                <div className="text-sm text-muted-foreground whitespace-pre-wrap italic border-l-2 border-primary/20 pl-3 py-1 bg-primary/5 rounded-r">
+                  {project.phase_2_itinerary.summary.notes}
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground italic">No trip-wide notes added yet.</p>
+              )}
+              {project.phase_2_itinerary.summary?.links && project.phase_2_itinerary.summary.links.length > 0 && (
+                <ul className="list-disc list-inside space-y-1">
+                  {project.phase_2_itinerary.summary.links.map((link, li) => (
+                    <li key={li} className="text-sm">
+                      {link.url ? (
+                        <a href={link.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline inline-flex items-center gap-1">
+                          <LinkIcon className="h-3 w-3" /> {link.label}
+                        </a>
+                      ) : (
+                        <span className="text-muted-foreground">{link.label}</span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+        </div>
 
         <hr className="my-4 border-border" />
 

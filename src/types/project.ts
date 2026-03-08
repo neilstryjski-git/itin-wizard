@@ -63,6 +63,7 @@ export interface ChatMessage {
 
 export interface TravelProject {
   project_id: string;
+  owner_email?: string; // Injected at runtime or stored
   metadata: {
     name: string;
     destination: string;
@@ -71,6 +72,7 @@ export interface TravelProject {
     travelers: { name: string; isMinor: boolean; passport?: string; citizenship?: string; residency?: string }[];
     transitViaUSA: boolean;
     transitCountry?: string;
+    collaborators?: string[]; // List of emails with access
     createdAt: string;
     updatedAt: string;
     status?: 'active' | 'archived';
@@ -82,6 +84,10 @@ export interface TravelProject {
   };
   phase_2_itinerary: {
     rawInput: string;
+    summary?: {
+      notes: string;
+      links: TravelLink[];
+    };
     events: ItineraryEvent[];
   };
   phase_3_packing: {

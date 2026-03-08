@@ -4,12 +4,14 @@ const EMAIL_KEY = 'travel-user-email';
 
 export function useUserEmail() {
   const [email, setEmailState] = useState<string | null>(() => {
-    return localStorage.getItem(EMAIL_KEY);
+    const stored = localStorage.getItem(EMAIL_KEY);
+    return stored ? stored.trim().toLowerCase() : null;
   });
 
   const setEmail = useCallback((newEmail: string) => {
-    localStorage.setItem(EMAIL_KEY, newEmail);
-    setEmailState(newEmail);
+    const normalized = newEmail.trim().toLowerCase();
+    localStorage.setItem(EMAIL_KEY, normalized);
+    setEmailState(normalized);
   }, []);
 
   const clearEmail = useCallback(() => {

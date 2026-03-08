@@ -22,6 +22,7 @@ See **AI_WOW.md** for interaction protocols and rules of engagement.
 ## 🚀 Feature Backlog
 | ID | Feature | Description | Target Agent |
 | :--- | :--- | :--- | :--- |
+| 🟢 Done | **Trip Summary** | Add an editable summary section at the top of the itinerary for trip-wide notes and links. | **♊ Gemini** |
 | **F8** | **QR Code / Digital Pass** | Detect and store digital passes (QR codes) in Supabase Storage, linking them to events for offline/quick access. | ♊ Gemini |
 | **F9** | **Google Drive Sync** | Automatically back up trip data to Google Drive for cross-device access. | 🤖 Claude |
 | **F5** | **Multi-Event Doc Split** | Automatically split a single document into multiple itinerary events if the AI detects more than one. | 🤖 Claude |
@@ -33,20 +34,24 @@ See **AI_WOW.md** for interaction protocols and rules of engagement.
 ## 🗣️ VoC Requests
 | User | Request | Status |
 | :--- | :--- | :--- |
-| `neil.stryjski@gmail.com` | **GDrive-Link Sync**: Enhance F9 to support saving files to GDrive and linking them directly to the itinerary. | 🆕 New |
+| `neil.stryjski@gmail.com` | **GDrive-Link Sync**: Enhance F9 to support saving files to GDrive and linking them directly to the itinerary. | 🟢 Synced |
 
 ---
 
 ## 🔴 Active Bugs
 | ID | Issue | Description | Current Owner |
 | :--- | :--- | :--- | :--- |
-| **B1** | **Meta Tag Cleanup** | Update index.html title and OG tags. | ♊ Gemini |
+| 🟢 Done | **Meta Tag Cleanup** | Update index.html title and OG tags. | **♊ Gemini** |
 
 ---
 
 ## 🟢 Resolved (History)
 | Date | ID | Task | Resolution |
 | :--- | :--- | :--- | :--- |
+| 2026-03-08 | F12 | PWA & Offline Support | Added Service Worker, Web Manifest, and React Query persistence for offline itinerary viewing. |
+| 2026-03-08 | F11 | Private Trip Sharing | Implemented email-based collaboration with full edit access and a management dialog. |
+| 2026-03-08 | B1 | Meta Tag Cleanup | Updated index.html title and meta tags to Itinerary Wizard. |
+| 2026-03-08 | F10 | Trip Summary | Added editable Trip Summary card at the top of the itinerary and included it in the PDF export. |
 | 2026-03-06 | F1 | User-Scoped Trips | Migrated to Supabase DB with email-based identity and automatic local storage migration bridge. |
 | 2026-03-06 | B5 | PDF Link New Tab | Optimized PDF link metadata to encourage opening in new browser tabs. |
 | 2026-03-06 | B6 | Editor Drop Zone | Restored full drag-and-drop zone in the event editor. |

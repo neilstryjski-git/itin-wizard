@@ -19,19 +19,30 @@ export function useProjects(email: string | null) {
       if (!email) return [];
       const normalizedEmail = email.trim().toLowerCase();
       
-      // Fetch projects where user is owner OR user is in the collaborators list
-      // Using PostgREST 'or' with JSONB containment filter
-      const { data, error } = await supabase
+      // 1. Fetch projects where user is owner
+      const { data: owned, error: ownedErr } = await supabase
         .from('projects')
         .select('*')
-        .or(`owner_email.eq.${normalizedEmail},data->metadata->collaborators.cs.["${normalizedEmail}"]`)
-        .order('created_at', { ascending: false });
+        .eq('owner_email', normalizedEmail);
       
-      if (error) throw error;
+      if (ownedErr) throw ownedErr;
 
-      return (data || []).map(row => ({
+      // 2. Fetch projects where user is a collaborator
+      // We use the JSONB containment filter directly
+      const { data: shared, error: sharedErr } = await supabase
+        .from('projects')
+        .select('*')
+        .contains('data', { metadata: { collaborators: [normalizedEmail] } });
+
+      if (sharedErr) throw sharedErr;
+
+      // 3. Combine and deduplicate by project_id
+      const allRows = [...(owned || []), ...(shared || [])];
+      const uniqueRows = Array.from(new Map(allRows.map(r => [r.project_id, r])).values());
+      
+      return uniqueRows.map(row => ({
         ...(row.data as unknown as TravelProject),
-        owner_email: row.owner_email // Inject owner info for UI checks
+        owner_email: row.owner_email
       }));
     },
     enabled: !!email,

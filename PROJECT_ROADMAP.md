@@ -20,14 +20,14 @@ See **AI_WOW.md** for interaction protocols and rules of engagement.
 ---
 
 ## 🚀 Feature Backlog
-| ID | Feature | Description | Target Agent |
-| :--- | :--- | :--- | :--- |
-| 🟢 Done | **Trip Summary** | Add an editable summary section at the top of the itinerary for trip-wide notes and links. | **♊ Gemini** |
-| **F8** | **QR Code / Digital Pass** | Detect and store digital passes (QR codes) in Supabase Storage, linking them to events for offline/quick access. | ♊ Gemini |
-| **F9** | **Cloud Vault (G-Drive)** | Permanent storage using a System Drive. Implements "Paperclip" flow for storage vs "Edit" flow for parsing. Includes auto-cleanup on trip deletion and "Bridge UX" to save files after parsing. | ♊ Gemini |
-| **F5** | **Multi-Event Doc Split** | Automatically split a single document into multiple itinerary events if the AI detects more than one. | 🤖 Claude |
-| **F6** | **Cloud Link Extraction** | Automatically extract and save document URLs (if available) as event links during AI parsing. | 🤖 Claude |
-| **F3** | **PDF Export Styles** | Enhance the visual layout of the PDF export for itineraries. | 🤖 Claude |
+| ID | Feature | Description | Target Agent | Status |
+| :--- | :--- | :--- | :--- | :--- |
+| **F9-UI** | **Cloud Vault UI** | Implement the "Paperclip" attachment button on cards, the "Bridge UX" popup after AI parsing, and the "Scanner" visual effect for parsing. | 🤖 Claude | **Ready** |
+| **F3** | **PDF Export Styles** | Enhance the visual layout and professional aesthetic of the PDF export. | 🤖 Claude | **Ready** |
+| **F5** | **Multi-Event Doc Split** | Automatically split a single document into multiple itinerary events if the AI detects more than one. | 🤖 Claude | **Ready** |
+| **F6** | **Cloud Link Extraction** | Automatically extract and save document URLs (if available) as event links during AI parsing. | 🤖 Claude | **Ready** |
+| **F9-BE** | **Cloud Vault Backend** | Implement System Service Account storage logic and auto-cleanup triggers. | ♊ Gemini | **Planning** |
+| **F8** | **QR Code Detection** | Detect and store digital passes (QR codes) in Supabase Storage. | ♊ Gemini | **Backlog** |
 
 ---
 

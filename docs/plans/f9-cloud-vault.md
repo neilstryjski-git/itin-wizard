@@ -8,12 +8,12 @@ Enable users to automatically back up trip data to Google Drive and link existin
 ## 📋 Task Board
 
 ### Phase 1: Preparation & Strategy
-- [ ] **T9.1: Define Sync Trigger Behavior**
+- [x] **T9.1: Define Sync Trigger Behavior**
   - **Assignee**: 👤 User
-  - **Task**: Decide if sync should be "Manual Export" or "Real-time Auto-save".
-- [ ] **T9.2: Select OAuth Scopes**
+  - **Decision**: **Real-time Auto-save**. The app will automatically sync changes to GDrive to ensure it "just works" for casual travelers.
+- [x] **T9.2: Select OAuth Scopes**
   - **Assignee**: ♊ Gemini
-  - **Task**: Research minimal scopes for `drive.file` vs `drive.appdata` to maximize privacy.
+  - **Result**: Selected `https://www.googleapis.com/auth/drive.file`. This allows the app to manage its own files and any files the user explicitly selects via the Picker, without requesting full access to the user's entire Drive.
 
 ### Phase 2: Infrastructure
 - [ ] **T9.3: Provision Google Cloud Project**
@@ -35,3 +35,5 @@ Enable users to automatically back up trip data to Google Drive and link existin
 
 ## 📓 Decision Log / Notes
 *   *2026-03-07*: Epic initialized. Hybrid Roadmap architecture adopted.
+*   *2026-03-07*: T9.1 - User selected "Real-time Auto-save" for a seamless, zero-effort experience.
+*   *2026-03-07*: T9.2 - Selected `drive.file` scope for maximum user privacy while maintaining full functionality for app-created files.

@@ -24,7 +24,7 @@ See **AI_WOW.md** for interaction protocols and rules of engagement.
 | :--- | :--- | :--- | :--- |
 | 🟢 Done | **Trip Summary** | Add an editable summary section at the top of the itinerary for trip-wide notes and links. | **♊ Gemini** |
 | **F8** | **QR Code / Digital Pass** | Detect and store digital passes (QR codes) in Supabase Storage, linking them to events for offline/quick access. | ♊ Gemini |
-| **F9** | **Google Drive Sync** | Automatically back up trip data to Google Drive for cross-device access. | 🤖 Claude |
+| **F9** | **Cloud Vault (G-Drive)** | Permanent storage using a System Drive. Implements "Paperclip" flow for storage vs "Edit" flow for parsing. Includes auto-cleanup on trip deletion and "Bridge UX" to save files after parsing. | ♊ Gemini |
 | **F5** | **Multi-Event Doc Split** | Automatically split a single document into multiple itinerary events if the AI detects more than one. | 🤖 Claude |
 | **F6** | **Cloud Link Extraction** | Automatically extract and save document URLs (if available) as event links during AI parsing. | 🤖 Claude |
 | **F3** | **PDF Export Styles** | Enhance the visual layout of the PDF export for itineraries. | 🤖 Claude |

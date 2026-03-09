@@ -22,6 +22,7 @@ See **AI_WOW.md** for interaction protocols and rules of engagement.
 ## 🚀 Feature Backlog
 | ID | Feature | Status | Owner | Plan |
 | :--- | :--- | :--- | :--- | :--- |
+| **F14** | **Minimalist PDF Template** | 📅 Planned | 🤖 Claude | [`f14-pdf-aesthetic.md`](docs/plans/f14-pdf-aesthetic.md) |
 | **F9** | **Cloud Vault (GDrive Sync)** | 🧠 Brainstorming | ♊ Gemini | [`f9-cloud-vault.md`](docs/plans/f9-cloud-vault.md) |
 | **F13** | **Gemini Native Migration** | 📅 Planned | ♊ Gemini | *Planned* |
 | **F8** | **QR Code Detection** | 📅 Backlog | ♊ Gemini | *Not Started* |

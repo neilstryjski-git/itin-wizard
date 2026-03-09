@@ -37,7 +37,8 @@ To ensure scalability and multi-agent coordination, we use a **Hybrid Roadmap**:
 ### Agent Interaction with Plans:
 1.  **Read**: If a task has a linked Plan file, the agent MUST read it before starting work.
 2.  **Update**: Agents MUST update the task status in the Plan file (from `[ ]` to `[x]`) immediately after completing a sub-task.
-3.  **Handoff**: If a task is assigned to a different owner (Claude, Gemini, or User), the current agent must summarize the progress and explicitly state the next required action.
+3.  **Auto-Commit**: Any changes to files in `docs/plans/` or `PROJECT_ROADMAP.md` MUST be automatically committed and pushed to GitHub immediately to maintain a live source of truth for all agents.
+4.  **Handoff**: If a task is assigned to a different owner (Claude, Gemini, or User), the current agent must summarize the progress and explicitly state the next required action.
 
 ## 4. Planning Mode (The "Brainstorm-Plan-Execute" Cycle)
 For any significant task (marked with `[Planning Required]` in the roadmap):

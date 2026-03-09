@@ -216,82 +216,131 @@ export default function ExportPreview() {
   const generatePDF = () => {
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
     const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
     const margin = 14;
-    let y = 15;
 
-    doc.setFontSize(16);
+    // Event-type colour palette [R, G, B]
+    const EVENT_COLOR: Record<string, [number, number, number]> = {
+      'flight':        [37,  99,  235],  // blue
+      'check-in':      [22, 163,  74],   // green
+      'check-out':     [20, 184, 166],   // teal
+      'accommodation': [22, 163,  74],   // green
+      'activity':      [234, 88,  12],   // orange
+      'transfer':      [124, 58, 237],   // purple
+    };
+    const DEFAULT_COLOR: [number, number, number] = [71, 85, 105]; // slate
+
+    const addPageNumbers = () => {
+      const totalPages = (doc as any).internal.getNumberOfPages();
+      for (let i = 1; i <= totalPages; i++) {
+        doc.setPage(i);
+        doc.setFontSize(7);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(160, 160, 160);
+        doc.text(
+          `Trip Wizard  •  Page ${i} of ${totalPages}`,
+          pageWidth / 2,
+          pageHeight - 8,
+          { align: 'center' }
+        );
+        doc.setTextColor(0, 0, 0);
+      }
+    };
+
+    // ── Cover block ──────────────────────────────────────────────────────────
+    let y = 18;
+
+    // Accent bar
+    doc.setFillColor(37, 99, 235);
+    doc.rect(margin, y - 6, 4, 14, 'F');
+
+    doc.setFontSize(20);
     doc.setFont('helvetica', 'bold');
-    doc.text(project.metadata.name || 'Travel Itinerary', margin, y);
-    y += 8;
+    doc.setTextColor(30, 41, 59);
+    doc.text(project.metadata.name || 'Travel Itinerary', margin + 7, y + 2);
+    doc.setTextColor(0, 0, 0);
+    y += 12;
 
+    // Metadata row
+    const metaParts: string[] = [];
+    if (project.metadata.startDate) {
+      metaParts.push(`${formatDate(project.metadata.startDate)} – ${project.metadata.endDate ? formatDate(project.metadata.endDate) : 'TBD'}`);
+    }
     if (project.metadata.travelers.length > 0) {
-      doc.setFontSize(11);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Travelers:', margin, y);
-      y += 5;
+      metaParts.push(project.metadata.travelers.map(t => `${t.name}${t.isMinor ? ' (minor)' : ''}`).join(', '));
+    }
+    if (metaParts.length > 0) {
+      doc.setFontSize(9);
       doc.setFont('helvetica', 'normal');
-      doc.text(project.metadata.travelers.map(t => `${t.name}${t.isMinor ? ' (minor)' : ''}`).join(', '), margin, y);
+      doc.setTextColor(100, 116, 139);
+      doc.text(metaParts.join('   |   '), margin + 7, y);
+      doc.setTextColor(0, 0, 0);
       y += 6;
     }
 
-    if (project.metadata.startDate && project.metadata.startDate.length > 0) {
-      doc.setFontSize(11);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Dates:', margin, y);
-      y += 5;
-      doc.setFont('helvetica', 'normal');
-      doc.text(`${formatDate(project.metadata.startDate)} – ${project.metadata.endDate ? formatDate(project.metadata.endDate) : 'TBD'}`, margin, y);
-      y += 8;
-    }
-
+    // Trip Summary
     if (project.phase_2_itinerary.summary && (project.phase_2_itinerary.summary.notes || project.phase_2_itinerary.summary.links.length > 0)) {
-      doc.setFontSize(11);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Trip Summary & Resources:', margin, y);
-      y += 5;
+      y += 2;
+      doc.setFillColor(241, 245, 249);
+      const summaryStartY = y;
 
       if (project.phase_2_itinerary.summary.notes) {
-        doc.setFontSize(9);
+        doc.setFontSize(8);
         doc.setFont('helvetica', 'italic');
-        const splitNotes = doc.splitTextToSize(project.phase_2_itinerary.summary.notes, pageWidth - margin * 2);
-        doc.text(splitNotes, margin, y);
-        y += (splitNotes.length * 4) + 2;
+        doc.setTextColor(51, 65, 85);
+        const splitNotes = doc.splitTextToSize(project.phase_2_itinerary.summary.notes, pageWidth - margin * 2 - 8);
+        const notesHeight = splitNotes.length * 4 + 6;
+        doc.rect(margin, summaryStartY, pageWidth - margin * 2, notesHeight, 'F');
+        doc.text(splitNotes, margin + 4, summaryStartY + 5);
+        doc.setTextColor(0, 0, 0);
+        y += notesHeight + 2;
       }
 
       if (project.phase_2_itinerary.summary.links.length > 0) {
-        doc.setFontSize(9);
+        doc.setFontSize(8);
         doc.setFont('helvetica', 'normal');
         project.phase_2_itinerary.summary.links.forEach(link => {
           if (y > 270) { doc.addPage(); y = 15; }
           const linkText = `• ${link.label}${link.url ? `: ${link.url}` : ''}`;
           const splitLink = doc.splitTextToSize(linkText, pageWidth - margin * 2);
+          doc.setTextColor(37, 99, 235);
           doc.text(splitLink, margin, y);
-          if (link.url) {
-            doc.link(margin, y - 3, pageWidth - margin * 2, 4, { url: link.url });
-          }
-          y += (splitLink.length * 4);
+          if (link.url) doc.link(margin, y - 3, pageWidth - margin * 2, 4, { url: link.url });
+          doc.setTextColor(0, 0, 0);
+          y += splitLink.length * 4;
         });
-        y += 4;
+        y += 2;
       }
     }
 
-    doc.setDrawColor(180);
+    // Divider
+    y += 4;
+    doc.setDrawColor(203, 213, 225);
+    doc.setLineWidth(0.4);
     doc.line(margin, y, pageWidth - margin, y);
     y += 6;
 
+    // ── Events ───────────────────────────────────────────────────────────────
     for (const entry of timeline) {
       const event = entry.event;
       if (y > 250) { doc.addPage(); y = 15; }
 
-      doc.setFontSize(12);
-      doc.setFont('helvetica', 'bold');
-      doc.text(getEventTitlePdf(event), margin, y);
-      y += 2;
+      const typeColor = EVENT_COLOR[event.type] || DEFAULT_COLOR;
 
-      const table = buildEventTable(event);
+      // Event title with left colour pip
+      doc.setFillColor(...typeColor);
+      doc.rect(margin, y - 3.5, 2.5, 7, 'F');
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(30, 41, 59);
+      doc.text(getEventTitlePdf(event), margin + 5, y + 1.5);
+      doc.setTextColor(0, 0, 0);
+      y += 3;
+
+      const table = buildEventTable(event, entry.isBookend);
       const pdfNotes = stripEmoji(table.notes);
 
-      // Build a map of field URLs and location auto-links for clickable PDF links
+      // Build clickable detail URLs
       const fieldMap: Record<string, string> = {
         'Location': 'location', 'Departure': 'departureLocation', 'Arrival': 'arrivalLocation',
       };
@@ -304,7 +353,6 @@ export default function ExportPreview() {
         if (url) detailUrls[i] = url;
       });
 
-      // Collect link URLs from notes column
       const linkUrls: string[] = event.links.map(l => l.url || '');
 
       const bodyRows = table.rows.map((r, i) => {
@@ -316,36 +364,40 @@ export default function ExportPreview() {
         }
         return [r.field, r.details, ''];
       });
+
       autoTable(doc, {
         startY: y,
         head: [['Field', 'Details', 'Notes/Documents']],
         body: bodyRows,
         margin: { left: margin, right: margin },
         theme: 'grid',
-        headStyles: { fillColor: [60, 60, 60], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
-        bodyStyles: { fontSize: 8, cellPadding: 2.5 },
-        columnStyles: { 0: { cellWidth: 28, fontStyle: 'bold' }, 1: { cellWidth: 'auto' }, 2: { cellWidth: 55 } },
-        styles: { overflow: 'linebreak', lineWidth: 0.2, lineColor: [200, 200, 200] },
+        headStyles: {
+          fillColor: typeColor,
+          textColor: [255, 255, 255],
+          fontStyle: 'bold',
+          fontSize: 8,
+        },
+        bodyStyles: { fontSize: 8, cellPadding: 2.5, textColor: [30, 41, 59] },
+        columnStyles: {
+          0: { cellWidth: 28, fontStyle: 'bold', textColor: [71, 85, 105] },
+          1: { cellWidth: 'auto' },
+          2: { cellWidth: 55, textColor: [71, 85, 105] },
+        },
+        styles: { overflow: 'linebreak', lineWidth: 0.2, lineColor: [226, 232, 240] },
         didDrawCell: (data: any) => {
           if (data.section !== 'body') return;
-          // Make Details column cells clickable
           if (data.column.index === 1 && detailUrls[data.row.index]) {
             doc.link(data.cell.x, data.cell.y, data.cell.width, data.cell.height, { url: detailUrls[data.row.index], newWindow: true });
-            // Draw text in blue to indicate it's a link
-            doc.setTextColor(30, 90, 200);
+            doc.setTextColor(37, 99, 235);
             doc.setFontSize(8);
             doc.text(data.cell.text.join(' '), data.cell.x + 2.5, data.cell.y + data.cell.height / 2 + 1);
             doc.setTextColor(0, 0, 0);
           }
-          // Make Notes/Documents column clickable per-link
           if (data.column.index === 2 && data.row.index === 0 && linkUrls.some(u => u)) {
-            // Add link annotations for each line in the notes cell
             const lineHeight = 3.5;
             let cy = data.cell.y + 2.5;
             linkUrls.forEach((url) => {
-              if (url) {
-                doc.link(data.cell.x, cy - 1.5, data.cell.width, lineHeight, { url, newWindow: true });
-              }
+              if (url) doc.link(data.cell.x, cy - 1.5, data.cell.width, lineHeight, { url, newWindow: true });
               cy += lineHeight;
             });
           }
@@ -356,33 +408,41 @@ export default function ExportPreview() {
 
     if (project.phase_1_requirements.checklist.length > 0) {
       if (y > 240) { doc.addPage(); y = 15; }
-      doc.setFontSize(12);
+      doc.setFillColor(37, 99, 235);
+      doc.rect(margin, y - 3.5, 2.5, 7, 'F');
+      doc.setFontSize(11);
       doc.setFont('helvetica', 'bold');
-      doc.text('Requirements Checklist', margin, y);
-      y += 2;
+      doc.setTextColor(30, 41, 59);
+      doc.text('Requirements Checklist', margin + 5, y + 1.5);
+      doc.setTextColor(0, 0, 0);
+      y += 3;
       autoTable(doc, {
         startY: y,
         head: [['', 'Item', 'Notes']],
         body: project.phase_1_requirements.checklist.map(item => [item.checked ? 'Y' : '-', item.title, item.description || '']),
         margin: { left: margin, right: margin },
         theme: 'grid',
-        headStyles: { fillColor: [60, 60, 60], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
-        bodyStyles: { fontSize: 8, cellPadding: 2.5 },
-        columnStyles: { 0: { cellWidth: 10, halign: 'center' }, 1: { cellWidth: 'auto' }, 2: { cellWidth: 55 } },
-        styles: { overflow: 'linebreak', lineWidth: 0.2, lineColor: [200, 200, 200] },
+        headStyles: { fillColor: [71, 85, 105], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
+        bodyStyles: { fontSize: 8, cellPadding: 2.5, textColor: [30, 41, 59] },
+        columnStyles: { 0: { cellWidth: 10, halign: 'center', textColor: [22, 163, 74], fontStyle: 'bold' }, 1: { cellWidth: 'auto' }, 2: { cellWidth: 55, textColor: [71, 85, 105] } },
+        styles: { overflow: 'linebreak', lineWidth: 0.2, lineColor: [226, 232, 240] },
       });
       y = (doc as any).lastAutoTable.finalY + 8;
     }
 
     if (project.phase_3_packing.items.length > 0) {
       if (y > 240) { doc.addPage(); y = 15; }
-      doc.setFontSize(12);
+      doc.setFillColor(37, 99, 235);
+      doc.rect(margin, y - 3.5, 2.5, 7, 'F');
+      doc.setFontSize(11);
       doc.setFont('helvetica', 'bold');
-      doc.text('Packing List', margin, y);
-      y += 2;
+      doc.setTextColor(30, 41, 59);
+      doc.text('Packing List', margin + 5, y + 1.5);
+      doc.setTextColor(0, 0, 0);
+      y += 3;
       const cats = [...new Set(project.phase_3_packing.items.map(i => i.category))].sort();
       const packRows = cats.flatMap(cat => [
-        [{ content: cat, colSpan: 3, styles: { fontStyle: 'bold' as const, fillColor: [240, 240, 240] as [number, number, number] } }],
+        [{ content: cat, colSpan: 3, styles: { fontStyle: 'bold' as const, fillColor: [241, 245, 249] as [number, number, number], textColor: [51, 65, 85] as [number, number, number] } }],
         ...project.phase_3_packing.items.filter(i => i.category === cat).map(item => [item.checked ? 'Y' : '-', item.name, item.assignedTo || '']),
       ]);
       autoTable(doc, {
@@ -391,13 +451,14 @@ export default function ExportPreview() {
         body: packRows,
         margin: { left: margin, right: margin },
         theme: 'grid',
-        headStyles: { fillColor: [60, 60, 60], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
-        bodyStyles: { fontSize: 8, cellPadding: 2.5 },
-        columnStyles: { 0: { cellWidth: 10, halign: 'center' }, 1: { cellWidth: 'auto' }, 2: { cellWidth: 40 } },
-        styles: { overflow: 'linebreak', lineWidth: 0.2, lineColor: [200, 200, 200] },
+        headStyles: { fillColor: [71, 85, 105], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
+        bodyStyles: { fontSize: 8, cellPadding: 2.5, textColor: [30, 41, 59] },
+        columnStyles: { 0: { cellWidth: 10, halign: 'center', textColor: [22, 163, 74], fontStyle: 'bold' }, 1: { cellWidth: 'auto' }, 2: { cellWidth: 40, textColor: [71, 85, 105] } },
+        styles: { overflow: 'linebreak', lineWidth: 0.2, lineColor: [226, 232, 240] },
       });
     }
 
+    addPageNumbers();
     doc.save(`${(project.metadata.name || 'itinerary').replace(/\s+/g, '_')}.pdf`);
     toast.success('PDF downloaded!');
   };

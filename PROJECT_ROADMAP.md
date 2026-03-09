@@ -20,14 +20,20 @@ See **AI_WOW.md** for interaction protocols and rules of engagement.
 ---
 
 ## 🚀 Feature Backlog
-| ID | Feature | Description | Target Agent | Status |
+| ID | Feature | Status | Owner | Plan |
 | :--- | :--- | :--- | :--- | :--- |
-| **F9-UI** | **Cloud Vault UI** | Implement the "Paperclip" attachment button on cards, the "Bridge UX" popup after AI parsing, and the "Scanner" visual effect for parsing. | 🤖 Claude | **Ready** |
-| **F3** | **PDF Export Styles** | Enhance the visual layout and professional aesthetic of the PDF export. | 🤖 Claude | **Ready** |
-| **F5** | **Multi-Event Doc Split** | Automatically split a single document into multiple itinerary events if the AI detects more than one. | 🤖 Claude | **Ready** |
-| **F6** | **Cloud Link Extraction** | Automatically extract and save document URLs (if available) as event links during AI parsing. | 🤖 Claude | **Ready** |
-| **F9-BE** | **Cloud Vault Backend** | Implement System Service Account storage logic and auto-cleanup triggers. | ♊ Gemini | **Planning** |
-| **F8** | **QR Code Detection** | Detect and store digital passes (QR codes) in Supabase Storage. | ♊ Gemini | **Backlog** |
+| **F9** | **Cloud Vault (GDrive Sync)** | 🧠 Brainstorming | ♊ Gemini | [`f9-cloud-vault.md`](docs/plans/f9-cloud-vault.md) |
+| **F13** | **Gemini Native Migration** | 📅 Planned | ♊ Gemini | *Planned* |
+| **F8** | **QR Code Detection** | 📅 Backlog | ♊ Gemini | *Not Started* |
+
+---
+
+## 🟢 Resolved Features (History)
+| Date | ID | Feature | Resolution |
+| :--- | :--- | :--- | :--- |
+| 2026-03-08 | F3 | PDF Export Styles | Enhanced with event-type colour-coded headers and refined typography. |
+| 2026-03-08 | F5 | Multi-Event Doc Split | Multiple events in docs are now appended to the timeline. |
+| 2026-03-08 | F6 | Cloud Link Extraction | URLs are extracted from documents and merged into event links. |
 
 ---
 
@@ -48,6 +54,9 @@ See **AI_WOW.md** for interaction protocols and rules of engagement.
 ## 🟢 Resolved (History)
 | Date | ID | Task | Resolution |
 | :--- | :--- | :--- | :--- |
+| 2026-03-08 | F3 | PDF Export Styles | Event-type colour-coded table headers, left-pip section titles, improved cover page with accent bar, page numbers, and refined slate/blue colour palette. |
+| 2026-03-08 | F6 | Cloud Link Extraction | Confirmed already fully implemented across all AI parse paths (bulk parse, per-event drop, edit form). No code change required. |
+| 2026-03-08 | F5 | Multi-Event Doc Split | Extended handleEventAIUpdate in Phase2Itinerary to append all events beyond the first as new timeline entries when a multi-event document is dropped on an existing card. |
 | 2026-03-08 | T1 | E2E Testing Suite | Set up Playwright for end-to-end testing, including a spec for the itinerary workflow and UI interactions. |
 | 2026-03-08 | UX2 | Identity Management | Refined the email prompt to be closable when a user is already logged in, while remaining mandatory for first-time users. Added a "Change User" button to the header. |
 | 2026-03-08 | UX1 | New Event Workflow | Improved the "Add Event" experience with in-line active cards, auto-focus, scroll-to-view, and intelligent chronological tie-breaking. |

@@ -336,44 +336,69 @@ export default function Phase2Itinerary() {
       
       const parsedEvents = data.events || [];
       if (parsedEvents.length > 0) {
-        // UseCase 2: If multiple events in doc, update the current card with the first one
         const newInfo = parsedEvents[0];
-        
+
+        // Build new events for any additional documents detected beyond the first
+        const extraEvents: ItineraryEvent[] = parsedEvents.slice(1).map((ev: any) => ({
+          id: crypto.randomUUID(),
+          type: ev.type || 'activity',
+          title: ev.title || 'Untitled Event',
+          date: normalizeDate(ev.date) || new Date().toISOString().split('T')[0],
+          endDate: ev.endDate ? normalizeDate(ev.endDate) : undefined,
+          time: ev.time,
+          location: ev.location,
+          address: ev.address,
+          confirmationCode: ev.confirmationCode,
+          flightNumber: ev.flightNumber,
+          departureLocation: ev.departureLocation,
+          arrivalLocation: ev.arrivalLocation,
+          departureTime: ev.departureTime,
+          arrivalTime: ev.arrivalTime,
+          notes: ev.notes,
+          links: ev.links || [],
+          createdAt: new Date().toISOString(),
+        } as ItineraryEvent));
+
         updateProject(projectId!, p => ({
           ...p,
           phase_2_itinerary: {
             ...p.phase_2_itinerary,
-            events: p.phase_2_itinerary.events.map(e => {
-              if (e.id !== eventId) return e;
-              
-              const merged = { ...e };
-              // UseCase 1: Sparse Merge
-              // Only update title if it's currently generic
-              if (!merged.title || merged.title === 'New Event' || merged.title === 'Untitled Event') {
-                if (newInfo.title) merged.title = newInfo.title;
-              }
-              
-              if (newInfo.date) merged.date = normalizeDate(newInfo.date);
-              if (newInfo.time && !merged.time) merged.time = newInfo.time;
-              if (newInfo.location && !merged.location) merged.location = newInfo.location;
-              if (newInfo.address && !merged.address) merged.address = newInfo.address;
-              if (newInfo.confirmationCode) merged.confirmationCode = newInfo.confirmationCode;
-              if (newInfo.flightNumber) merged.flightNumber = newInfo.flightNumber;
-              
-              if (newInfo.links && newInfo.links.length > 0) {
-                merged.links = [...(merged.links || []), ...newInfo.links];
-              }
-              
-              // Only append to notes, never overwrite
-              if (newInfo.notes) {
-                merged.notes = merged.notes ? `${merged.notes}\n---\n${newInfo.notes}` : newInfo.notes;
-              }
+            events: [
+              ...p.phase_2_itinerary.events.map(e => {
+                if (e.id !== eventId) return e;
 
-              return merged;
-            })
+                const merged = { ...e };
+                // Sparse Merge — only update title if it's currently generic
+                if (!merged.title || merged.title === 'New Event' || merged.title === 'Untitled Event') {
+                  if (newInfo.title) merged.title = newInfo.title;
+                }
+
+                if (newInfo.date) merged.date = normalizeDate(newInfo.date);
+                if (newInfo.time && !merged.time) merged.time = newInfo.time;
+                if (newInfo.location && !merged.location) merged.location = newInfo.location;
+                if (newInfo.address && !merged.address) merged.address = newInfo.address;
+                if (newInfo.confirmationCode) merged.confirmationCode = newInfo.confirmationCode;
+                if (newInfo.flightNumber) merged.flightNumber = newInfo.flightNumber;
+
+                if (newInfo.links && newInfo.links.length > 0) {
+                  merged.links = [...(merged.links || []), ...newInfo.links];
+                }
+
+                if (newInfo.notes) {
+                  merged.notes = merged.notes ? `${merged.notes}\n---\n${newInfo.notes}` : newInfo.notes;
+                }
+
+                return merged;
+              }),
+              ...extraEvents,
+            ],
           }
         }));
-        toast.success("Event updated with AI data from your document.");
+
+        const msg = extraEvents.length > 0
+          ? `Event updated + ${extraEvents.length} additional event(s) added to timeline.`
+          : "Event updated with AI data from your document.";
+        toast.success(msg);
       } else {
         toast.info("No event data found in that document.");
       }

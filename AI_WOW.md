@@ -28,7 +28,18 @@ Every AI session MUST start by:
 5.  Update the `status` of these entries to `'synced'` in the `projects` table.
 6.  This ensures user feedback is always integrated into the development cycle.
 
-## 3. Planning Mode (The "Brainstorm-Plan-Execute" Cycle)
+## 3. Project Management Structure (Epic & Task)
+To ensure scalability and multi-agent coordination, we use a **Hybrid Roadmap**:
+- **Master Roadmap (`PROJECT_ROADMAP.md`)**: The high-level index of all Epics, Bugs, and VoC requests.
+- **Implementation Plans (`/docs/plans/f<ID>.md`)**: Detailed breakdown for complex features.
+- **Task ID System**: Tasks are referenced as `T<FeatureID>.<Number>` (e.g., `T9.1`).
+
+### Agent Interaction with Plans:
+1.  **Read**: If a task has a linked Plan file, the agent MUST read it before starting work.
+2.  **Update**: Agents MUST update the task status in the Plan file (from `[ ]` to `[x]`) immediately after completing a sub-task.
+3.  **Handoff**: If a task is assigned to a different owner (Claude, Gemini, or User), the current agent must summarize the progress and explicitly state the next required action.
+
+## 4. Planning Mode (The "Brainstorm-Plan-Execute" Cycle)
 For any significant task (marked with `[Planning Required]` in the roadmap):
 1. **Brainstorm**: The current owner iterates on thoughts with the user. **No code changes are permitted during this phase.**
 2. **Strategy**: The owner proposes a formal `Step-by-Step Implementation & Testing Plan`.

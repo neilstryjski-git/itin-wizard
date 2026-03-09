@@ -37,7 +37,9 @@ Rules:
 - Omit fields that have no data (don't include null or empty strings).
 - If you cannot determine a date, use today's date.
 - Be thorough: extract every piece of useful information from all provided documents and text.
-- Process ALL documents/images provided and extract ALL events from each one.`;
+- Process ALL documents/images provided and extract ALL events from each one.
+- IMPORTANT: When extracting dates, ignore email communication metadata such as "Sent:", "Received:", or the date the email was printed/saved. Only extract dates that refer to the actual travel events (flight departure, hotel check-in, etc.).
+- If a document contains multiple potential dates, prioritize those explicitly linked to a confirmation, booking, or reservation.`;
 
 const toolDef = {
   type: "function",

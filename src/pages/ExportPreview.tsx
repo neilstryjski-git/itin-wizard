@@ -71,7 +71,7 @@ export default function ExportPreview() {
 
   if (!project) { navigate('/'); return null; }
 
-  const timeline = buildTimeline(project.phase_2_itinerary.events, { preserveOrder: true });
+  const timeline = buildTimeline(project.phase_2_itinerary.events);
 
   const updateEvent = (eventId: string, updates: Partial<ItineraryEvent>) => {
     updateProject(projectId!, p => ({

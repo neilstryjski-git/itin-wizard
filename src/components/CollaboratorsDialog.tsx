@@ -103,40 +103,31 @@ export function CollaboratorsDialog({ project, trigger }: CollaboratorsDialogPro
                     <span className="flex items-center gap-2">
                       <Mail className="h-3.5 w-3.5 opacity-60" /> {email}
                     </span>
-                    {isOwner && (
-                      <button 
-                        onClick={() => removeCollaborator(email)}
-                        className="text-destructive hover:bg-destructive/10 p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity"
-                      >
-                        <X className="h-3.5 w-3.5" />
-                      </button>
-                    )}
+                    <button 
+                      onClick={() => removeCollaborator(email)}
+                      className="text-destructive hover:bg-destructive/10 p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
                   </div>
                 ))
               )}
             </div>
           </div>
 
-          {isOwner && (
-            <div className="flex gap-2 pt-2">
-              <Input
-                placeholder="Email address"
-                value={newEmail}
-                onChange={e => setNewEmail(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && addCollaborator()}
-                type="email"
-                className="flex-1"
-              />
-              <Button onClick={addCollaborator} size="sm" className="gap-1">
-                <Plus className="h-3 w-3" /> Invite
-              </Button>
-            </div>
-          )}
-          {!isOwner && (
-            <p className="text-[10px] text-center text-muted-foreground italic">
-              Only the trip owner can manage collaborator access.
-            </p>
-          )}
+          <div className="flex gap-2 pt-2">
+            <Input
+              placeholder="Email address"
+              value={newEmail}
+              onChange={e => setNewEmail(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && addCollaborator()}
+              type="email"
+              className="flex-1"
+            />
+            <Button onClick={addCollaborator} size="sm" className="gap-1">
+              <Plus className="h-3 w-3" /> Invite
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

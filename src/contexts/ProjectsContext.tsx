@@ -13,6 +13,8 @@ interface ProjectsContextType {
   email: string | null;
   setEmail: (email: string) => void;
   clearEmail: () => void;
+  isChangingUser: boolean;
+  setIsChangingUser: (val: boolean) => void;
 }
 
 const ProjectsContext = createContext<ProjectsContextType | null>(null);
@@ -20,8 +22,22 @@ const ProjectsContext = createContext<ProjectsContextType | null>(null);
 export function ProjectsProvider({ children }: { children: React.ReactNode }) {
   const { email, setEmail, clearEmail } = useUserEmail();
   const projectsData = useProjects(email);
+  const [isChangingUser, setIsChangingUser] = React.useState(false);
+
+  const handleSetEmail = (newEmail: string) => {
+    setEmail(newEmail);
+    setIsChangingUser(false);
+  };
+
   return (
-    <ProjectsContext.Provider value={{ ...projectsData, email, setEmail, clearEmail }}>
+    <ProjectsContext.Provider value={{ 
+      ...projectsData, 
+      email, 
+      setEmail: handleSetEmail, 
+      clearEmail,
+      isChangingUser,
+      setIsChangingUser
+    }}>
       {children}
     </ProjectsContext.Provider>
   );

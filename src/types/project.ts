@@ -43,6 +43,7 @@ export interface ItineraryEvent {
   missingFields?: string[];
   attachments?: FileAttachment[];
   fieldUrls?: Record<string, string>; // Maps field keys (e.g. 'location', 'confirmationCode') to URLs
+  createdAt?: string; // For sorting tie-breaks (newest first for same time)
 }
 
 export interface PackingItem {

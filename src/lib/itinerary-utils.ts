@@ -279,7 +279,13 @@ export function buildTimeline(events: ItineraryEvent[], options?: { preserveOrde
     const tsA = parseToTimestamp(a.displayDate, a.displayTime);
     const tsB = parseToTimestamp(b.displayDate, b.displayTime);
     if (tsA !== tsB) return tsA - tsB;
-    // Tie-break: check-in before other events, check-out after
+
+    // Tie-break 1: Newest first for events at the EXACT same time
+    const createdA = a.event.createdAt ? new Date(a.event.createdAt).getTime() : 0;
+    const createdB = b.event.createdAt ? new Date(b.event.createdAt).getTime() : 0;
+    if (createdA !== createdB) return createdB - createdA; // Newest first
+
+    // Tie-break 2: bookend priority (fallback)
     const priority = (e: TimelineEntry) =>
       e.isBookend === 'check-in' ? 0 : e.isBookend === 'check-out' ? 2 : 1;
     return priority(a) - priority(b);

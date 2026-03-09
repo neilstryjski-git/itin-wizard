@@ -3,12 +3,17 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { TravelProject } from '@/types/project';
 import { toast } from 'sonner';
+import { Tables } from '@/integrations/supabase/types';
 
 function projectsQueryKey(email: string) {
   return ['projects', email];
 }
 
 const LEGACY_STORAGE_KEY = 'travel-projects';
+
+interface ProjectCollaboratorLink {
+  project_id: string;
+}
 
 export function useProjects(email: string | null) {
   const queryClient = useQueryClient();
@@ -27,17 +32,36 @@ export function useProjects(email: string | null) {
       
       if (ownedErr) throw ownedErr;
 
-      // 2. Fetch projects where user is a collaborator
-      // Using verified path-based containment filter
-      const { data: shared, error: sharedErr } = await supabase
+      // 2. Fetch projects where user is a collaborator (from JSON data)
+      // Using .contains on the jsonb column for maximum reliability
+      const { data: sharedJson, error: sharedJsonErr } = await supabase
         .from('projects')
         .select('*')
-        .filter('data->metadata->collaborators', 'cs', `["${normalizedEmail}"]`);
+        .contains('data', { metadata: { collaborators: [normalizedEmail] } });
 
-      if (sharedErr) throw sharedErr;
+      if (sharedJsonErr) throw sharedJsonErr;
 
-      // 3. Combine and deduplicate by project_id
-      const allRows = [...(owned || []), ...(shared || [])];
+      // 3. Fetch projects where user is a collaborator (from collaborators table)
+      const { data: sharedTableLinks, error: tableErr } = await supabase
+        .from('project_collaborators')
+        .select('project_id')
+        .eq('user_email', normalizedEmail);
+      
+      let sharedTable: Tables<'projects'>[] = [];
+      if (!tableErr && sharedTableLinks && (sharedTableLinks as unknown as ProjectCollaboratorLink[]).length > 0) {
+        const links = sharedTableLinks as unknown as ProjectCollaboratorLink[];
+        const ids = links.map(l => l.project_id);
+        const { data: tableProjects, error: tableProjErr } = await supabase
+          .from('projects')
+          .select('*')
+          .in('project_id', ids);
+        if (!tableProjErr && tableProjects) {
+          sharedTable = tableProjects as Tables<'projects'>[];
+        }
+      }
+
+      // 4. Combine and deduplicate by project_id
+      const allRows = [...(owned || []), ...(sharedJson || []), ...sharedTable];
       const uniqueRows = Array.from(new Map(allRows.map(r => [r.project_id, r])).values());
       
       return uniqueRows.map(row => ({
@@ -56,6 +80,15 @@ export function useProjects(email: string | null) {
         data: JSON.parse(JSON.stringify(project)),
       }]);
       if (error) throw error;
+
+      // Sync collaborators to table if any
+      if (project.metadata.collaborators && project.metadata.collaborators.length > 0) {
+        const collaborators = project.metadata.collaborators.map(c => ({
+          project_id: project.project_id,
+          user_email: c.trim().toLowerCase()
+        }));
+        await supabase.from('project_collaborators').upsert(collaborators, { onConflict: 'project_id,user_email' });
+      }
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: projectsQueryKey(email!) }),
   });
@@ -86,6 +119,15 @@ export function useProjects(email: string | null) {
               owner_email: email,
               data: JSON.parse(JSON.stringify(lp)),
             }]);
+            
+            // Sync collaborators from migrated project
+            if (lp.metadata.collaborators && lp.metadata.collaborators.length > 0) {
+              const collaborators = lp.metadata.collaborators.map(c => ({
+                project_id: lp.project_id,
+                user_email: c.trim().toLowerCase()
+              }));
+              await supabase.from('project_collaborators').upsert(collaborators, { onConflict: 'project_id,user_email' });
+            }
           }
         }
 
@@ -118,6 +160,25 @@ export function useProjects(email: string | null) {
         .update({ data: JSON.parse(JSON.stringify(updated)) })
         .eq('project_id', projectId);
       if (error) throw error;
+
+      // Sync collaborators to table
+      const newCollabs = updated.metadata.collaborators || [];
+      const oldCollabs = current.metadata.collaborators || [];
+      
+      // Add new ones
+      const toAdd = newCollabs.filter(c => !oldCollabs.includes(c));
+      if (toAdd.length > 0) {
+        await supabase.from('project_collaborators').upsert(
+          toAdd.map(c => ({ project_id: projectId, user_email: c })),
+          { onConflict: 'project_id,user_email' }
+        );
+      }
+      
+      // Remove old ones
+      const toRemove = oldCollabs.filter(c => !newCollabs.includes(c));
+      if (toRemove.length > 0) {
+        await supabase.from('project_collaborators').delete().eq('project_id', projectId).in('user_email', toRemove);
+      }
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: projectsQueryKey(email!) }),
   });

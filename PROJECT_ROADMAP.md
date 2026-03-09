@@ -48,6 +48,10 @@ See **AI_WOW.md** for interaction protocols and rules of engagement.
 ## 🟢 Resolved (History)
 | Date | ID | Task | Resolution |
 | :--- | :--- | :--- | :--- |
+| 2026-03-08 | T1 | E2E Testing Suite | Set up Playwright for end-to-end testing, including a spec for the itinerary workflow and UI interactions. |
+| 2026-03-08 | UX2 | Identity Management | Refined the email prompt to be closable when a user is already logged in, while remaining mandatory for first-time users. Added a "Change User" button to the header. |
+| 2026-03-08 | UX1 | New Event Workflow | Improved the "Add Event" experience with in-line active cards, auto-focus, scroll-to-view, and intelligent chronological tie-breaking. |
+| 2026-03-08 | B7 | Sharing Fixes | Allowed non-owners to manage collaborators and improved shared project visibility for specific users (e.g. maevestryjski190@gmail.com) via robust JSONB containment and table-syncing. |
 | 2026-03-08 | F12 | PWA & Offline Support | Added Service Worker, Web Manifest, and React Query persistence for offline itinerary viewing. |
 | 2026-03-08 | F11 | Private Trip Sharing | Implemented email-based collaboration with full edit access and a management dialog. |
 | 2026-03-08 | B1 | Meta Tag Cleanup | Updated index.html title and meta tags to Trip Wizard. |

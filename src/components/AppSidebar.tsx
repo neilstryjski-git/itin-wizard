@@ -14,7 +14,7 @@ export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === 'collapsed';
   const location = useLocation();
-  const { getProject, email, clearEmail } = useProjectsContext();
+  const { getProject, email, setIsChangingUser } = useProjectsContext();
   const projectMatch = location.pathname.match(/\/project\/([^/]+)/);
   const projectId = projectMatch ? projectMatch[1] : undefined;
   const project = projectId ? getProject(projectId) : undefined;
@@ -96,14 +96,14 @@ export function AppSidebar() {
               <SidebarMenuButton
                 size="lg"
                 className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
-                onClick={clearEmail}
-                title={`Logout ${email}`}
+                onClick={() => setIsChangingUser(true)}
+                title={`Change User (${email})`}
               >
                 <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
                   <LogOut className="size-4" />
                 </div>
                 <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-semibold">Logout</span>
+                  <span className="truncate font-semibold">Change User</span>
                   <span className="truncate text-xs">{email}</span>
                 </div>
               </SidebarMenuButton>

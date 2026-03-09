@@ -68,18 +68,16 @@ export default function Dashboard() {
                       </div>
                     </div>
                     <div className="flex gap-1">
-                      {isOwner && (
-                        <div onClick={e => e.stopPropagation()}>
-                          <CollaboratorsDialog 
-                            project={p} 
-                            trigger={
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary">
-                                <Users className="h-4 w-4" />
-                              </Button>
-                            }
-                          />
-                        </div>
-                      )}
+                      <div onClick={e => e.stopPropagation()}>
+                        <CollaboratorsDialog 
+                          project={p} 
+                          trigger={
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary">
+                              <Users className="h-4 w-4" />
+                            </Button>
+                          }
+                        />
+                      </div>
                       {isOwner && (
                         <Button
                           variant="ghost"

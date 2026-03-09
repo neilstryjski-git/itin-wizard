@@ -7,9 +7,11 @@ import { Palmtree } from 'lucide-react';
 interface EmailPromptProps {
   open: boolean;
   onSubmit: (email: string) => void;
+  onClose?: () => void;
+  closable?: boolean;
 }
 
-export function EmailPrompt({ open, onSubmit }: EmailPromptProps) {
+export function EmailPrompt({ open, onSubmit, onClose, closable = false }: EmailPromptProps) {
   const [value, setValue] = useState('');
   const [error, setError] = useState('');
 
@@ -24,8 +26,21 @@ export function EmailPrompt({ open, onSubmit }: EmailPromptProps) {
   };
 
   return (
-    <Dialog open={open}>
-      <DialogContent className="sm:max-w-md" onPointerDownOutside={e => e.preventDefault()}>
+    <Dialog open={open} onOpenChange={(val) => {
+      if (!val && closable && onClose) {
+        onClose();
+      }
+    }}>
+      <DialogContent 
+        className="sm:max-w-md" 
+        onPointerDownOutside={e => {
+          if (!closable) e.preventDefault();
+        }}
+        onEscapeKeyDown={e => {
+          if (!closable) e.preventDefault();
+        }}
+        showCloseButton={closable}
+      >
         <DialogHeader>
           <div className="flex items-center gap-2 mb-2">
             <Palmtree className="h-6 w-6 text-primary" />

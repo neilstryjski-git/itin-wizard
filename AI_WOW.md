@@ -1,8 +1,8 @@
 # AI Way of Working (WoW) - Trip Wizard
 
 ## ⚙️ Runtime Configuration
-> **Active Agents:** `[ ♊ Gemini ]` (Single Agent Mode)
-> *Note: When Claude is introduced, update to `[ ♊ Gemini, 🤖 Claude ]` to enable the Baton Pass protocol.*
+> **Active Agents:** `[ ♊ Gemini, 🤖 Claude ]` (Multi-Agent Mode)
+> *Note: Baton Pass protocol is now active. See Section 4 for handoff rules.*
 
 ---
 

@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
@@ -49,6 +49,27 @@ export default function Phase2Itinerary() {
   const [editForm, setEditForm] = useState<Partial<ItineraryEvent>>({});
   const [summaryForm, setSummaryForm] = useState<{ notes: string; links: TravelLink[] }>({ notes: '', links: [] });
   const [isParsing, setIsParsing] = useState(false);
+  const editingCardRef = useRef<HTMLDivElement>(null);
+
+  // Auto-focus title when editingId changes and the event is present in the list
+  useEffect(() => {
+    if (editingId && project?.phase_2_itinerary.events.some(e => e.id === editingId)) {
+      const timer = setTimeout(() => {
+        // Find the specific title input within the editing card ref for maximum precision
+        if (editingCardRef.current) {
+          const titleInput = editingCardRef.current.querySelector('input[name="title"]') as HTMLInputElement;
+          if (titleInput) {
+            titleInput.focus();
+            titleInput.select();
+          }
+
+          // Scroll to the card
+          editingCardRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 200); // Slightly longer timeout to ensure DOM is settled after refetch
+      return () => clearTimeout(timer);
+    }
+  }, [editingId, project?.phase_2_itinerary.events]);
 
   const startEditSummary = () => {
     setSummaryForm({
@@ -162,7 +183,7 @@ export default function Phase2Itinerary() {
 
   if (!project) { navigate('/'); return null; }
 
-  const timelineEntries = buildTimeline(project.phase_2_itinerary.events, { preserveOrder: true });
+  const timelineEntries = buildTimeline(project.phase_2_itinerary.events);
 
   const parseAndAdd = parseDocuments;
 
@@ -185,6 +206,7 @@ export default function Phase2Itinerary() {
       notes: ev.notes,
       links: ev.links || [],
       attachments: ev.attachments || [],
+      createdAt: new Date().toISOString(),
     } as ItineraryEvent));
 
     // Sort new events chronologically (soonest first) before adding
@@ -243,12 +265,20 @@ export default function Phase2Itinerary() {
   };
 
   const addBlankEvent = () => {
+    if (editingId) {
+      toast.info("Please save or cancel your current edit first.");
+      // If we are already editing, just scroll to it to remind them
+      editingCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+
     const newEvent: ItineraryEvent = {
       id: crypto.randomUUID(),
       type: 'activity',
       title: 'New Event',
       date: new Date().toISOString().split('T')[0],
       links: [],
+      createdAt: new Date().toISOString(),
     };
     updateProject(projectId!, p => ({
       ...p,
@@ -394,16 +424,21 @@ export default function Phase2Itinerary() {
           </div>
         </div>
         <div className="flex gap-2">
-          {isOwner && (
-            <CollaboratorsDialog project={project} />
-          )}
-          <Button variant="outline" size="sm" onClick={addBlankEvent} className="gap-1">
+          <CollaboratorsDialog project={project} />
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={addBlankEvent} 
+            className="gap-1"
+            disabled={!!editingId}
+          >
             <Plus className="h-3 w-3" /> Add Event
           </Button>
           <Button
             size="sm"
             className="gap-1"
             onClick={() => navigate(`/project/${projectId}/packing`)}
+            disabled={!!editingId}
           >
             <ArrowRight className="h-3 w-3" /> Packing
           </Button>
@@ -411,7 +446,7 @@ export default function Phase2Itinerary() {
       </div>
 
       {/* Step 1: Upload Documents */}
-      <Card className="mb-6">
+      <Card className={`mb-6 transition-opacity ${editingId ? 'opacity-50 pointer-events-none' : ''}`}>
         <CardContent className="p-4 space-y-3">
           <div className="flex items-center gap-2 text-sm font-medium">
             <Upload className="h-4 w-4 text-muted-foreground" />
@@ -446,7 +481,7 @@ export default function Phase2Itinerary() {
       </Card>
 
       {/* Optional: Paste text */}
-      <Card className="mb-6">
+      <Card className={`mb-6 transition-opacity ${editingId ? 'opacity-50 pointer-events-none' : ''}`}>
         <CardContent className="p-4 space-y-3">
           <div className="flex items-center gap-2 text-sm font-medium">
             <FileText className="h-4 w-4 text-muted-foreground" />
@@ -466,7 +501,7 @@ export default function Phase2Itinerary() {
       <div className="mb-8">
         <Button
           onClick={parseDocuments}
-          disabled={isParsing || (uploadedDocs.length === 0 && !rawInput.trim())}
+          disabled={isParsing || !!editingId || (uploadedDocs.length === 0 && !rawInput.trim())}
           className="w-full gap-2"
         >
           {isParsing ? (
@@ -475,6 +510,11 @@ export default function Phase2Itinerary() {
             <><Sparkles className="h-4 w-4" /> Parse {uploadedDocs.length > 0 ? `${uploadedDocs.length} document(s)` : 'text'} with AI</>
           )}
         </Button>
+        {editingId && (
+          <p className="text-[10px] text-center text-muted-foreground mt-2 italic">
+            Save or cancel your current edit to parse more documents.
+          </p>
+        )}
       </div>
 
       {/* Preview Step */}
@@ -738,7 +778,13 @@ export default function Phase2Itinerary() {
               const isDraggable = true;
 
               const cardContent = (
-                <Card className="relative slide-up" style={{ animationDelay: `${i * 40}ms` }}>
+                <Card 
+                  ref={isEditing ? editingCardRef : undefined}
+                  className={`relative slide-up transition-all duration-300 ${
+                    isEditing ? 'border-primary ring-2 ring-primary/20 shadow-lg scale-[1.02]' : ''
+                  }`}
+                  style={{ animationDelay: `${i * 40}ms` }}
+                >
                   <CardContent className="p-4">
                     {isEditing ? (
                       <EditForm
@@ -962,7 +1008,13 @@ function EditForm({
         </div>
         <div>
           <label className="text-xs font-medium text-muted-foreground">Title</label>
-          <Input value={form.title || ''} onChange={e => setForm({ ...form, title: e.target.value })} />
+          <Input 
+            name="title" 
+            value={form.title || ''} 
+            onChange={e => setForm({ ...form, title: e.target.value })}
+            onFocus={e => e.target.select()}
+            className={(!form.title || form.title === 'New Event' || form.title === 'Untitled Event') ? 'text-muted-foreground/60' : ''}
+          />
         </div>
       </div>
       {form.type === 'flight' ? (
@@ -970,29 +1022,29 @@ function EditForm({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-medium text-muted-foreground">Date</label>
-              <Input type="date" value={form.date || ''} onChange={e => setForm({ ...form, date: e.target.value })} />
+              <Input type="date" value={form.date || ''} onChange={e => setForm({ ...form, date: e.target.value })} onFocus={e => e.target.select()} />
             </div>
             <div>
               <label className="text-xs font-medium text-muted-foreground">Flight #</label>
-              <Input value={form.flightNumber || ''} onChange={e => setForm({ ...form, flightNumber: e.target.value })} />
+              <Input value={form.flightNumber || ''} onChange={e => setForm({ ...form, flightNumber: e.target.value })} onFocus={e => e.target.select()} />
             </div>
           </div>
           <div className="grid grid-cols-4 gap-3">
             <div>
               <label className="text-xs font-medium text-muted-foreground">Departure City</label>
-              <Input value={form.departureLocation || ''} onChange={e => setForm({ ...form, departureLocation: e.target.value })} />
+              <Input value={form.departureLocation || ''} onChange={e => setForm({ ...form, departureLocation: e.target.value })} onFocus={e => e.target.select()} />
             </div>
             <div>
               <label className="text-xs font-medium text-muted-foreground">Departure Time</label>
-              <Input type="time" value={form.departureTime || ''} onChange={e => setForm({ ...form, departureTime: e.target.value })} />
+              <Input type="time" value={form.departureTime || ''} onChange={e => setForm({ ...form, departureTime: e.target.value })} onFocus={e => e.target.select()} />
             </div>
             <div>
               <label className="text-xs font-medium text-muted-foreground">Arrival City</label>
-              <Input value={form.arrivalLocation || ''} onChange={e => setForm({ ...form, arrivalLocation: e.target.value })} />
+              <Input value={form.arrivalLocation || ''} onChange={e => setForm({ ...form, arrivalLocation: e.target.value })} onFocus={e => e.target.select()} />
             </div>
             <div>
               <label className="text-xs font-medium text-muted-foreground">Arrival Time</label>
-              <Input type="time" value={form.arrivalTime || ''} onChange={e => setForm({ ...form, arrivalTime: e.target.value })} />
+              <Input type="time" value={form.arrivalTime || ''} onChange={e => setForm({ ...form, arrivalTime: e.target.value })} onFocus={e => e.target.select()} />
             </div>
           </div>
         </>
@@ -1000,27 +1052,27 @@ function EditForm({
         <div className={`grid gap-3 ${form.type === 'accommodation' ? 'grid-cols-4' : 'grid-cols-3'}`}>
           <div>
             <label className="text-xs font-medium text-muted-foreground">{form.type === 'accommodation' ? 'Check-in Date' : 'Date'}</label>
-            <Input type="date" value={form.date || ''} onChange={e => setForm({ ...form, date: e.target.value })} />
+            <Input type="date" value={form.date || ''} onChange={e => setForm({ ...form, date: e.target.value })} onFocus={e => e.target.select()} />
           </div>
           {form.type === 'accommodation' && (
             <div>
               <label className="text-xs font-medium text-muted-foreground">Check-out Date</label>
-              <Input type="date" value={form.endDate || ''} onChange={e => setForm({ ...form, endDate: e.target.value })} />
+              <Input type="date" value={form.endDate || ''} onChange={e => setForm({ ...form, endDate: e.target.value })} onFocus={e => e.target.select()} />
             </div>
           )}
           <div>
             <label className="text-xs font-medium text-muted-foreground">Time</label>
-            <Input type="time" value={form.time || ''} onChange={e => setForm({ ...form, time: e.target.value })} />
+            <Input type="time" value={form.time || ''} onChange={e => setForm({ ...form, time: e.target.value })} onFocus={e => e.target.select()} />
           </div>
           <div>
             <label className="text-xs font-medium text-muted-foreground">Location</label>
-            <Input value={form.location || ''} onChange={e => setForm({ ...form, location: e.target.value })} />
+            <Input value={form.location || ''} onChange={e => setForm({ ...form, location: e.target.value })} onFocus={e => e.target.select()} />
           </div>
         </div>
       )}
       <div>
         <label className="text-xs font-medium text-muted-foreground">Confirmation Code</label>
-        <Input value={form.confirmationCode || ''} onChange={e => setForm({ ...form, confirmationCode: e.target.value })} />
+        <Input value={form.confirmationCode || ''} onChange={e => setForm({ ...form, confirmationCode: e.target.value })} onFocus={e => e.target.select()} />
       </div>
       <div>
         <label className="text-xs font-medium text-muted-foreground">Notes</label>

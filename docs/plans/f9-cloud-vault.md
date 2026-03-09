@@ -31,6 +31,11 @@ Enable users to automatically back up trip data to Google Drive and link existin
   - **Assignee**: 🤖 Claude
   - **Task**: Integrate Google Picker API for selecting existing files.
 
+## 🔑 Infrastructure Credentials
+- **GDrive Client ID**: `21135593182-8o6gbnu0ul0qb82p3oaqs0q88faect2t.apps.googleusercontent.com`
+- **GDrive Client Secret**: *[RESTRICTED]* Stored in Supabase Secrets as `GDRIVE_CLIENT_SECRET`.
+- **Redirect URIs**: `http://localhost:8080`, `https://productdelivered.ca`
+
 ---
 
 ## 📓 Decision Log / Notes

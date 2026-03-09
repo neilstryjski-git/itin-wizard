@@ -46,7 +46,7 @@ For any significant task (marked with `[Planning Required]` in the roadmap):
 2. **Strategy**: The owner proposes a formal `Step-by-Step Implementation & Testing Plan`.
 3. **Approval Gate**: The owner MUST wait for an explicit **"Proceed"** or **"Approve"** from the user before starting execution.
 
-## 4. Collaborative Protocols
+## 5. Collaborative Protocols
 
 ### Single Agent Mode (Current)
 - The active agent performs the full lifecycle: Research → Brainstorm → Strategy → Execution → Validation.
@@ -59,7 +59,7 @@ For any significant task (marked with `[Planning Required]` in the roadmap):
 2. **Direct Trigger**: If the next agent's CLI is available (e.g., `claude` or `gemini`), the finishing agent should trigger the next agent with: `[cli-command] "Baton Pass: [Task ID] [Next Step] is ready. See PROJECT_ROADMAP.md."`
 3. **No-Loop Policy**: The user should not be required to manually copy context between agents.
 
-## 5. Coding Standards & Safety
+## 6. Coding Standards & Safety
 - **Surgical Edits**: Prefer targeted `replace` calls over full-file overwrites for large files.
 - **Validation**: Every task is incomplete until verified via tests or project-specific build/lint commands.
 - **Bugs**: Every bug fix or feature completion must be logged in the `Resolved (History)` section of `PROJECT_ROADMAP.md`.

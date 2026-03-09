@@ -18,15 +18,16 @@ Refine the PDF export aesthetic to a "Minimalist Line Art" style (Option C), mov
 - [x] **T14.1: Selection**
   - **Assignee**: 👤 User
   - **Result**: Option C (Minimalist Line Art) selected.
-- [ ] **T14.2: Implement PDF Aesthetic**
+- [x] **T14.2: Implement PDF Aesthetic**
   - **Assignee**: 🤖 Claude
   - **Task**: Modify `src/pages/ExportPreview.tsx` to remove header fills and add line-based styling.
-  - **Status**: **Ready**
+  - **Status**: **Done** — theme switched to `plain`, header fills removed, coloured bottom-border drawn via `didDrawCell`, pips narrowed to 2mm, cover page uses left-rule for summary, all colours desaturated to muted palette.
 
 ### Phase 2: Validation
-- [ ] **T14.3: User Review**
+- [x] **T14.3: User Review**
   - **Assignee**: 👤 User
   - **Task**: Generate a PDF from the app and confirm the new look.
+  - **Result**: Approved. Three follow-up fixes confirmed resolved: blurry hyperlinked text (didParseCell), notes column link visibility (blue text), and event block page splits (pre-render height estimate).
 
 ---
 

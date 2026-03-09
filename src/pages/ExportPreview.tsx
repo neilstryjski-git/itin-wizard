@@ -219,16 +219,16 @@ export default function ExportPreview() {
     const pageHeight = doc.internal.pageSize.getHeight();
     const margin = 14;
 
-    // Event-type colour palette [R, G, B]
+    // Event-type accent colours — muted/desaturated for minimalist line-art style
     const EVENT_COLOR: Record<string, [number, number, number]> = {
-      'flight':        [37,  99,  235],  // blue
-      'check-in':      [22, 163,  74],   // green
-      'check-out':     [20, 184, 166],   // teal
-      'accommodation': [22, 163,  74],   // green
-      'activity':      [234, 88,  12],   // orange
-      'transfer':      [124, 58, 237],   // purple
+      'flight':        [70,  105, 175],  // muted blue
+      'check-in':      [50,  130,  90],  // muted green
+      'check-out':     [45,  145, 138],  // muted teal
+      'accommodation': [50,  130,  90],  // muted green
+      'activity':      [185,  95,  50],  // muted orange
+      'transfer':      [115,  80, 180],  // muted purple
     };
-    const DEFAULT_COLOR: [number, number, number] = [71, 85, 105]; // slate
+    const DEFAULT_COLOR: [number, number, number] = [100, 110, 125]; // muted slate
 
     const addPageNumbers = () => {
       const totalPages = (doc as any).internal.getNumberOfPages();
@@ -250,16 +250,16 @@ export default function ExportPreview() {
     // ── Cover block ──────────────────────────────────────────────────────────
     let y = 18;
 
-    // Accent bar
-    doc.setFillColor(37, 99, 235);
-    doc.rect(margin, y - 6, 4, 14, 'F');
+    // Thin accent pip (2mm wide, not a full bar)
+    doc.setFillColor(70, 105, 175);
+    doc.rect(margin, y - 5, 2, 12, 'F');
 
-    doc.setFontSize(20);
+    doc.setFontSize(18);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(30, 41, 59);
-    doc.text(project.metadata.name || 'Travel Itinerary', margin + 7, y + 2);
+    doc.text(project.metadata.name || 'Travel Itinerary', margin + 5, y + 2);
     doc.setTextColor(0, 0, 0);
-    y += 12;
+    y += 10;
 
     // Metadata row
     const metaParts: string[] = [];
@@ -270,28 +270,31 @@ export default function ExportPreview() {
       metaParts.push(project.metadata.travelers.map(t => `${t.name}${t.isMinor ? ' (minor)' : ''}`).join(', '));
     }
     if (metaParts.length > 0) {
-      doc.setFontSize(9);
+      doc.setFontSize(8.5);
       doc.setFont('helvetica', 'normal');
-      doc.setTextColor(100, 116, 139);
-      doc.text(metaParts.join('   |   '), margin + 7, y);
+      doc.setTextColor(110, 120, 135);
+      doc.text(metaParts.join('   |   '), margin + 5, y);
       doc.setTextColor(0, 0, 0);
-      y += 6;
+      y += 7;
     }
 
-    // Trip Summary
+    // Trip Summary — no background fill, just indented italic text
     if (project.phase_2_itinerary.summary && (project.phase_2_itinerary.summary.notes || project.phase_2_itinerary.summary.links.length > 0)) {
       y += 2;
-      doc.setFillColor(241, 245, 249);
-      const summaryStartY = y;
+      // Thin left rule
+      doc.setDrawColor(200, 210, 220);
+      doc.setLineWidth(0.5);
+      doc.line(margin, y, margin, y + 20); // will be extended below
 
       if (project.phase_2_itinerary.summary.notes) {
         doc.setFontSize(8);
         doc.setFont('helvetica', 'italic');
-        doc.setTextColor(51, 65, 85);
-        const splitNotes = doc.splitTextToSize(project.phase_2_itinerary.summary.notes, pageWidth - margin * 2 - 8);
-        const notesHeight = splitNotes.length * 4 + 6;
-        doc.rect(margin, summaryStartY, pageWidth - margin * 2, notesHeight, 'F');
-        doc.text(splitNotes, margin + 4, summaryStartY + 5);
+        doc.setTextColor(80, 90, 105);
+        const splitNotes = doc.splitTextToSize(project.phase_2_itinerary.summary.notes, pageWidth - margin * 2 - 6);
+        doc.text(splitNotes, margin + 4, y + 4);
+        const notesHeight = splitNotes.length * 4 + 4;
+        // Extend the left rule to full height
+        doc.line(margin, y, margin, y + notesHeight);
         doc.setTextColor(0, 0, 0);
         y += notesHeight + 2;
       }
@@ -302,10 +305,10 @@ export default function ExportPreview() {
         project.phase_2_itinerary.summary.links.forEach(link => {
           if (y > 270) { doc.addPage(); y = 15; }
           const linkText = `• ${link.label}${link.url ? `: ${link.url}` : ''}`;
-          const splitLink = doc.splitTextToSize(linkText, pageWidth - margin * 2);
-          doc.setTextColor(37, 99, 235);
-          doc.text(splitLink, margin, y);
-          if (link.url) doc.link(margin, y - 3, pageWidth - margin * 2, 4, { url: link.url });
+          const splitLink = doc.splitTextToSize(linkText, pageWidth - margin * 2 - 6);
+          doc.setTextColor(70, 105, 175);
+          doc.text(splitLink, margin + 4, y);
+          if (link.url) doc.link(margin + 4, y - 3, pageWidth - margin * 2 - 6, 4, { url: link.url });
           doc.setTextColor(0, 0, 0);
           y += splitLink.length * 4;
         });
@@ -313,32 +316,33 @@ export default function ExportPreview() {
       }
     }
 
-    // Divider
-    y += 4;
-    doc.setDrawColor(203, 213, 225);
-    doc.setLineWidth(0.4);
+    // Thin divider
+    y += 5;
+    doc.setDrawColor(210, 215, 220);
+    doc.setLineWidth(0.3);
     doc.line(margin, y, pageWidth - margin, y);
-    y += 6;
+    y += 7;
 
     // ── Events ───────────────────────────────────────────────────────────────
     for (const entry of timeline) {
       const event = entry.event;
-      if (y > 250) { doc.addPage(); y = 15; }
-
       const typeColor = EVENT_COLOR[event.type] || DEFAULT_COLOR;
+      const table = buildEventTable(event, entry.isBookend);
+      const pdfNotes = stripEmoji(table.notes);
+
+      // Break the page before drawing if the block won't fit
+      const estimatedHeight = 14 + 9 + (table.rows.length * 10);
+      if (y + estimatedHeight > pageHeight - 20) { doc.addPage(); y = 15; }
 
       // Event title with left colour pip
       doc.setFillColor(...typeColor);
-      doc.rect(margin, y - 3.5, 2.5, 7, 'F');
-      doc.setFontSize(11);
+      doc.rect(margin, y - 3.5, 2, 7, 'F');
+      doc.setFontSize(10);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(30, 41, 59);
       doc.text(getEventTitlePdf(event), margin + 5, y + 1.5);
       doc.setTextColor(0, 0, 0);
       y += 3;
-
-      const table = buildEventTable(event, entry.isBookend);
-      const pdfNotes = stripEmoji(table.notes);
 
       // Build clickable detail URLs
       const fieldMap: Record<string, string> = {
@@ -370,28 +374,45 @@ export default function ExportPreview() {
         head: [['Field', 'Details', 'Notes/Documents']],
         body: bodyRows,
         margin: { left: margin, right: margin },
-        theme: 'grid',
+        theme: 'plain',
         headStyles: {
-          fillColor: typeColor,
-          textColor: [255, 255, 255],
+          fillColor: [255, 255, 255],
+          textColor: [80, 90, 105],
           fontStyle: 'bold',
-          fontSize: 8,
+          fontSize: 7.5,
+          cellPadding: { top: 2, right: 2.5, bottom: 3, left: 2.5 },
         },
-        bodyStyles: { fontSize: 8, cellPadding: 2.5, textColor: [30, 41, 59] },
+        bodyStyles: { fontSize: 8, cellPadding: 3, textColor: [30, 41, 59] },
         columnStyles: {
-          0: { cellWidth: 28, fontStyle: 'bold', textColor: [71, 85, 105] },
+          0: { cellWidth: 28, fontStyle: 'bold', textColor: [100, 110, 125] },
           1: { cellWidth: 'auto' },
-          2: { cellWidth: 55, textColor: [71, 85, 105] },
+          2: { cellWidth: 55, textColor: [100, 110, 125], fontSize: 7.5 },
         },
-        styles: { overflow: 'linebreak', lineWidth: 0.2, lineColor: [226, 232, 240] },
-        didDrawCell: (data: any) => {
+        styles: { overflow: 'linebreak', lineWidth: 0.15, lineColor: [225, 230, 235] },
+        didParseCell: (data: any) => {
           if (data.section !== 'body') return;
+          // Set link colour before autotable draws — prevents double-rendering
+          if (data.column.index === 1 && detailUrls[data.row.index]) {
+            data.cell.styles.textColor = [70, 105, 175];
+          }
+          if (data.column.index === 2 && data.row.index === 0 && linkUrls.some(u => u)) {
+            data.cell.styles.textColor = [70, 105, 175];
+          }
+        },
+        didDrawCell: (data: any) => {
+          // Coloured bottom border on header row
+          if (data.section === 'head') {
+            doc.setDrawColor(...typeColor);
+            doc.setLineWidth(0.5);
+            doc.line(data.cell.x, data.cell.y + data.cell.height, data.cell.x + data.cell.width, data.cell.y + data.cell.height);
+            doc.setDrawColor(225, 230, 235);
+            doc.setLineWidth(0.15);
+            return;
+          }
+          if (data.section !== 'body') return;
+          // Link annotations only — text colour is handled by didParseCell, no redraw
           if (data.column.index === 1 && detailUrls[data.row.index]) {
             doc.link(data.cell.x, data.cell.y, data.cell.width, data.cell.height, { url: detailUrls[data.row.index], newWindow: true });
-            doc.setTextColor(37, 99, 235);
-            doc.setFontSize(8);
-            doc.text(data.cell.text.join(' '), data.cell.x + 2.5, data.cell.y + data.cell.height / 2 + 1);
-            doc.setTextColor(0, 0, 0);
           }
           if (data.column.index === 2 && data.row.index === 0 && linkUrls.some(u => u)) {
             const lineHeight = 3.5;
@@ -408,9 +429,9 @@ export default function ExportPreview() {
 
     if (project.phase_1_requirements.checklist.length > 0) {
       if (y > 240) { doc.addPage(); y = 15; }
-      doc.setFillColor(37, 99, 235);
-      doc.rect(margin, y - 3.5, 2.5, 7, 'F');
-      doc.setFontSize(11);
+      doc.setFillColor(70, 105, 175);
+      doc.rect(margin, y - 3.5, 2, 7, 'F');
+      doc.setFontSize(10);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(30, 41, 59);
       doc.text('Requirements Checklist', margin + 5, y + 1.5);
@@ -421,20 +442,29 @@ export default function ExportPreview() {
         head: [['', 'Item', 'Notes']],
         body: project.phase_1_requirements.checklist.map(item => [item.checked ? 'Y' : '-', item.title, item.description || '']),
         margin: { left: margin, right: margin },
-        theme: 'grid',
-        headStyles: { fillColor: [71, 85, 105], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
-        bodyStyles: { fontSize: 8, cellPadding: 2.5, textColor: [30, 41, 59] },
-        columnStyles: { 0: { cellWidth: 10, halign: 'center', textColor: [22, 163, 74], fontStyle: 'bold' }, 1: { cellWidth: 'auto' }, 2: { cellWidth: 55, textColor: [71, 85, 105] } },
-        styles: { overflow: 'linebreak', lineWidth: 0.2, lineColor: [226, 232, 240] },
+        theme: 'plain',
+        headStyles: { fillColor: [255, 255, 255], textColor: [80, 90, 105], fontStyle: 'bold', fontSize: 7.5, cellPadding: { top: 2, right: 2.5, bottom: 3, left: 2.5 } },
+        bodyStyles: { fontSize: 8, cellPadding: 3, textColor: [30, 41, 59] },
+        columnStyles: { 0: { cellWidth: 10, halign: 'center', textColor: [50, 130, 90], fontStyle: 'bold' }, 1: { cellWidth: 'auto' }, 2: { cellWidth: 55, textColor: [100, 110, 125], fontSize: 7.5 } },
+        styles: { overflow: 'linebreak', lineWidth: 0.15, lineColor: [225, 230, 235] },
+        didDrawCell: (data: any) => {
+          if (data.section === 'head') {
+            doc.setDrawColor(70, 105, 175);
+            doc.setLineWidth(0.5);
+            doc.line(data.cell.x, data.cell.y + data.cell.height, data.cell.x + data.cell.width, data.cell.y + data.cell.height);
+            doc.setDrawColor(225, 230, 235);
+            doc.setLineWidth(0.15);
+          }
+        },
       });
       y = (doc as any).lastAutoTable.finalY + 8;
     }
 
     if (project.phase_3_packing.items.length > 0) {
       if (y > 240) { doc.addPage(); y = 15; }
-      doc.setFillColor(37, 99, 235);
-      doc.rect(margin, y - 3.5, 2.5, 7, 'F');
-      doc.setFontSize(11);
+      doc.setFillColor(70, 105, 175);
+      doc.rect(margin, y - 3.5, 2, 7, 'F');
+      doc.setFontSize(10);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(30, 41, 59);
       doc.text('Packing List', margin + 5, y + 1.5);
@@ -442,7 +472,7 @@ export default function ExportPreview() {
       y += 3;
       const cats = [...new Set(project.phase_3_packing.items.map(i => i.category))].sort();
       const packRows = cats.flatMap(cat => [
-        [{ content: cat, colSpan: 3, styles: { fontStyle: 'bold' as const, fillColor: [241, 245, 249] as [number, number, number], textColor: [51, 65, 85] as [number, number, number] } }],
+        [{ content: cat, colSpan: 3, styles: { fontStyle: 'bold' as const, fillColor: [248, 249, 251] as [number, number, number], textColor: [80, 90, 105] as [number, number, number], fontSize: 7.5 } }],
         ...project.phase_3_packing.items.filter(i => i.category === cat).map(item => [item.checked ? 'Y' : '-', item.name, item.assignedTo || '']),
       ]);
       autoTable(doc, {
@@ -450,11 +480,20 @@ export default function ExportPreview() {
         head: [['', 'Item', 'Assigned To']],
         body: packRows,
         margin: { left: margin, right: margin },
-        theme: 'grid',
-        headStyles: { fillColor: [71, 85, 105], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
-        bodyStyles: { fontSize: 8, cellPadding: 2.5, textColor: [30, 41, 59] },
-        columnStyles: { 0: { cellWidth: 10, halign: 'center', textColor: [22, 163, 74], fontStyle: 'bold' }, 1: { cellWidth: 'auto' }, 2: { cellWidth: 40, textColor: [71, 85, 105] } },
-        styles: { overflow: 'linebreak', lineWidth: 0.2, lineColor: [226, 232, 240] },
+        theme: 'plain',
+        headStyles: { fillColor: [255, 255, 255], textColor: [80, 90, 105], fontStyle: 'bold', fontSize: 7.5, cellPadding: { top: 2, right: 2.5, bottom: 3, left: 2.5 } },
+        bodyStyles: { fontSize: 8, cellPadding: 3, textColor: [30, 41, 59] },
+        columnStyles: { 0: { cellWidth: 10, halign: 'center', textColor: [50, 130, 90], fontStyle: 'bold' }, 1: { cellWidth: 'auto' }, 2: { cellWidth: 40, textColor: [100, 110, 125] } },
+        styles: { overflow: 'linebreak', lineWidth: 0.15, lineColor: [225, 230, 235] },
+        didDrawCell: (data: any) => {
+          if (data.section === 'head') {
+            doc.setDrawColor(70, 105, 175);
+            doc.setLineWidth(0.5);
+            doc.line(data.cell.x, data.cell.y + data.cell.height, data.cell.x + data.cell.width, data.cell.y + data.cell.height);
+            doc.setDrawColor(225, 230, 235);
+            doc.setLineWidth(0.15);
+          }
+        },
       });
     }
 

@@ -64,5 +64,11 @@ For any significant task (marked with `[Planning Required]` in the roadmap):
 - **Validation**: Every task is incomplete until verified via tests or project-specific build/lint commands.
 - **Bugs**: Every bug fix or feature completion must be logged in the `Resolved (History)` section of `PROJECT_ROADMAP.md`.
 
+## 7. Bug Accountability (Fix-Your-Own-Mess)
+- **Primary Responsibility**: When a bug is identified in a recently implemented feature, the agent who was the **Current Owner** of that task is responsible for the fix. This maintains context continuity and enforces an "Owner's Mindset."
+- **Architectural Bugs**: If a bug stems from a design oversight or state-machine error (the "What"), **♊ Gemini (The Architect)** is responsible for the resolution.
+- **Implementation Bugs**: If a bug stems from a coding error, UI regression, or styling flaw (the "How"), **🤖 Claude (The Builder)** is responsible for the resolution.
+- **The "Surgical Fix" Exception**: If a bug is a "Critical/Blocker" (breaks the build or core user flow) and the primary agent is unavailable, the active agent may perform a surgical fix. They must clearly document the change and notify the primary agent in the roadmap for follow-up review.
+
 ---
 *Note: This protocol is foundational. If any agent's internal instructions conflict with this WoW, this file takes precedence.*

@@ -41,6 +41,8 @@ const App = () => (
           <Routes>
             <Route element={<Layout />}>
               <Route path="/" element={<Dashboard />} />
+              <Route path="/finalized" element={<Dashboard />} />
+              <Route path="/archive" element={<Dashboard />} />
               <Route path="/roadmap" element={<Roadmap />} />
               <Route path="/project/:projectId/interview" element={<Phase1Interview />} />
               <Route path="/project/:projectId/itinerary" element={<Phase2Itinerary />} />

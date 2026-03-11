@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 import {
   Pencil, Save, X, AlertTriangle, Plus, Trash2, Plane, Hotel,
   MapPin, Clock, Link as LinkIcon, FileText, ArrowRight, Loader2, Sparkles, Check,
-  Upload, Image, File, ShieldCheck,
+  Upload, Image, File, ShieldCheck, LockOpen,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -44,6 +44,7 @@ export default function Phase2Itinerary() {
   const project = getProject(projectId!);
   const isOwner = project?.owner_email?.trim().toLowerCase() === email?.trim().toLowerCase();
   const isFinalized = project?.metadata.is_finalized;
+  const isLocked = project?.metadata.is_locked !== false;
 
   const handleFinalize = () => {
     if (!projectId) return;
@@ -515,6 +516,14 @@ export default function Phase2Itinerary() {
           </Button>
         </div>
       </div>
+
+      {/* Editing Mode Banner */}
+      {isFinalized && !isLocked && (
+        <div className="mb-4 flex items-center gap-2 px-4 py-2.5 rounded-md bg-amber-50 border border-amber-200 dark:bg-amber-950/30 dark:border-amber-900 text-amber-700 dark:text-amber-400 text-sm font-medium">
+          <LockOpen className="h-4 w-4 flex-shrink-0" />
+          <span>Editing Mode — this official record is unlocked. Lock it from the dashboard when done.</span>
+        </div>
+      )}
 
       {/* Step 1: Upload Documents */}
       <Card className={`mb-6 transition-opacity ${editingId ? 'opacity-50 pointer-events-none' : ''}`}>

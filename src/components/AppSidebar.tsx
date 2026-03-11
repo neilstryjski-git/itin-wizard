@@ -1,6 +1,7 @@
 import { useLocation } from 'react-router-dom';
 import {
-  Palmtree, LayoutDashboard, MessageCircle, CalendarDays, Backpack, Map, ChevronRight, LogOut, Mail,
+  Palmtree, MessageCircle, CalendarDays, Backpack, Map, ChevronRight, LogOut,
+  FileEdit, ShieldCheck, Archive,
 } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import {
@@ -14,13 +15,22 @@ export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === 'collapsed';
   const location = useLocation();
-  const { getProject, email, setIsChangingUser } = useProjectsContext();
+  const { getProject, email, setIsChangingUser, projects } = useProjectsContext();
   const projectMatch = location.pathname.match(/\/project\/([^/]+)/);
   const projectId = projectMatch ? projectMatch[1] : undefined;
   const project = projectId ? getProject(projectId) : undefined;
 
+  const draftCount = projects.filter(p => p.metadata.is_finalized !== true && p.metadata.status !== 'archived').length;
+  const finalizedCount = projects.filter(p => p.metadata.is_finalized === true && p.metadata.status !== 'archived').length;
+  const archiveCount = projects.filter(p => p.metadata.status === 'archived').length;
+
+  const libraryNav = [
+    { title: 'Drafts', url: '/', icon: FileEdit, count: draftCount, end: true },
+    { title: 'Finalized', url: '/finalized', icon: ShieldCheck, count: finalizedCount, end: false },
+    { title: 'Archive', url: '/archive', icon: Archive, count: archiveCount, end: false },
+  ];
+
   const mainNav = [
-    { title: 'Dashboard', url: '/', icon: LayoutDashboard },
     { title: 'Roadmap', url: '/roadmap', icon: Map },
   ];
 
@@ -43,6 +53,31 @@ export function AppSidebar() {
         </div>
       </SidebarHeader>
       <SidebarContent>
+        <SidebarGroup>
+          <SidebarGroupLabel>Travel Library</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {libraryNav.map(item => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton asChild>
+                    <NavLink to={item.url} end={item.end} activeClassName="bg-sidebar-accent text-sidebar-accent-foreground">
+                      <item.icon className="mr-2 h-4 w-4 flex-shrink-0" />
+                      {!collapsed && (
+                        <span className="flex-1">{item.title}</span>
+                      )}
+                      {!collapsed && item.count > 0 && (
+                        <span className="ml-auto text-xs font-medium bg-muted text-muted-foreground rounded-full px-1.5 py-0.5 min-w-[1.25rem] text-center">
+                          {item.count}
+                        </span>
+                      )}
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
         <SidebarGroup>
           <SidebarGroupLabel>Navigation</SidebarGroupLabel>
           <SidebarGroupContent>

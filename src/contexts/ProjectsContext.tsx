@@ -7,7 +7,7 @@ interface ProjectsContextType {
   projects: TravelProject[];
   isLoading: boolean;
   isError: boolean;
-  addProject: (p: TravelProject) => void;
+  addProject: (p: TravelProject, onSuccess?: () => void) => void;
   updateProject: (id: string, updater: (p: TravelProject) => TravelProject) => void;
   deleteProject: (id: string) => void;
   getProject: (id: string) => TravelProject | undefined;

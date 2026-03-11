@@ -1,5 +1,5 @@
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import {
   Plus, Plane, Trash2, MapPin, Users, Calendar, Mail, Pencil,
   ShieldCheck, Archive, RotateCcw, Lock, LockOpen, AlertTriangle,
@@ -25,6 +25,25 @@ export default function Dashboard() {
   const inputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Dynamic Home Route Redirection
+  useEffect(() => {
+    if (isLoading || projects.length === 0) return;
+    
+    // Only redirect if we are on the base root path
+    if (location.pathname === '/') {
+      const hasFinalized = projects.some(p => p.metadata.is_finalized === true && p.metadata.status !== 'archived');
+      const hasDrafts = projects.some(p => p.metadata.is_finalized !== true && p.metadata.status !== 'archived');
+      
+      if (hasFinalized) {
+        console.log("[Dashboard] Auto-redirecting to /finalized (found finalized trips)");
+        navigate('/finalized', { replace: true });
+      } else if (!hasDrafts) {
+        // This handles cases where only archived trips exist - stay on drafts for creation
+        console.log("[Dashboard] Staying on / drafts (no active drafts or finalized found)");
+      }
+    }
+  }, [isLoading, projects, location.pathname, navigate]);
 
   const filter: DashboardFilter =
     location.pathname === '/finalized' ? 'finalized' :

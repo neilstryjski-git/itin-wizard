@@ -14,6 +14,7 @@ See **AI_WOW.md** for interaction protocols and rules of engagement.
 | Status | Task | Description | Current Owner |
 | :--- | :--- | :--- | :--- |
 | 🟢 Done | **Direct Baton Pass Check** | Verified that Gemini can autonomously execute CLI commands for handoffs. | **♊ Gemini** |
+| 🟢 Done | **Security Hardening** | Implemented `.geminiignore`, project-specific SSH deploy keys, and sandbox isolation audit. | **♊ Gemini** |
 | 🟢 Done | **Way of Working (WoW) Initialized** | Create AI_WOW.md and move rules of engagement there. | **♊ Gemini** |
 | 🟢 Done | **Persona Definition** | Define Architect (Gemini) and Builder (Claude) roles in WoW. | **♊ Gemini** |
 
@@ -24,7 +25,7 @@ See **AI_WOW.md** for interaction protocols and rules of engagement.
 | :--- | :--- | :--- | :--- | :--- |
 | 🟢 Done | **F14: Minimalist PDF Template** | ✅ Done | 🤖 Claude | [`f14-pdf-aesthetic.md`](docs/plans/f14-pdf-aesthetic.md) |
 | **F9** | **Cloud Vault (GDrive Sync)** | 🟡 In Progress | 🤖 Claude | [`f9-cloud-vault.md`](docs/plans/f9-cloud-vault.md) |
-| **F16** | **The Travel Library** | 🟡 In Progress | ♊ Gemini | [`f16-finalize-trip.md`](docs/plans/f16-finalize-trip.md) |
+| **F16** | **The Travel Library** | ✅ Done | 🤖 Claude | [`f16-finalize-trip.md`](docs/plans/f16-finalize-trip.md) |
 | **F15** | **Test Trip for New Users** | ✅ Done | ♊ Gemini | *Direct Implementation* |
 | **F13** | **Gemini Native Migration** | 📅 Planned | ♊ Gemini | *Planned* |
 | **F8** | **QR Code Detection** | 📅 Backlog | ♊ Gemini | *Not Started* |

@@ -1,0 +1,25 @@
+# .geminiignore - Security Blindfold
+# AI agents (Gemini/Claude) will ignore these files.
+
+# 1. Credentials & Secrets
+.env
+.env.*
+*.pem
+*.key
+supabase/secrets.json
+supabase/.temp/
+
+# 2. Version Control Internals
+.git/
+.gitignore
+
+# 3. Build & Dependencies
+node_modules/
+dist/
+bun.lock
+bun.lockb
+package-lock.json
+
+# 4. Sensitive OS Files
+.DS_Store
+Thumbs.db

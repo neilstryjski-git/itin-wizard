@@ -35,6 +35,7 @@ See **AI_WOW.md** for interaction protocols and rules of engagement.
 ## 🟢 Resolved Features (History)
 | Date | ID | Feature | Resolution |
 | :--- | :--- | :--- | :--- |
+| 2026-03-11 | B11 | Mobile Sidebar Labels | Fixed issue where sidebar labels and counts were hidden on mobile due to collapsed state logic. |
 | 2026-03-11 | B10 | Finalized Archive Locking | Restricted "Archive" action for finalized trips to only be available when the record is Unlocked. |
 | 2026-03-11 | B9 | Archive Button on Drafts | Removed the "Archive" action from draft trips in the Dashboard; drafts must now be Finalized before they can be Archived. |
 | 2026-03-09 | F15 | Test Trip for New Users | Automatically create a "Belize Family Adventure 2026 TEST" trip for new users, personalized with their identity as the sole traveler and re-assigned packing items. |

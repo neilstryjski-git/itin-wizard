@@ -12,8 +12,9 @@ import { useProjectsContext } from '@/contexts/ProjectsContext';
 import { Button } from '@/components/ui/button';
 
 export function AppSidebar() {
-  const { state } = useSidebar();
+  const { state, isMobile } = useSidebar();
   const collapsed = state === 'collapsed';
+  const showLabels = !collapsed || isMobile;
   const location = useLocation();
   const { getProject, email, setIsChangingUser, projects } = useProjectsContext();
   const projectMatch = location.pathname.match(/\/project\/([^/]+)/);
@@ -45,7 +46,7 @@ export function AppSidebar() {
       <SidebarHeader className="p-4">
         <div className="flex items-center gap-2">
           <Palmtree className="h-6 w-6 text-sidebar-primary" />
-          {!collapsed && (
+          {showLabels && (
             <span className="font-heading text-lg font-bold text-sidebar-foreground">
               Trip Wizard
             </span>
@@ -62,10 +63,10 @@ export function AppSidebar() {
                   <SidebarMenuButton asChild>
                     <NavLink to={item.url} end={item.end} activeClassName="bg-sidebar-accent text-sidebar-accent-foreground">
                       <item.icon className="mr-2 h-4 w-4 flex-shrink-0" />
-                      {!collapsed && (
+                      {showLabels && (
                         <span className="flex-1">{item.title}</span>
                       )}
-                      {!collapsed && item.count > 0 && (
+                      {showLabels && item.count > 0 && (
                         <span className="ml-auto text-xs font-medium bg-muted text-muted-foreground rounded-full px-1.5 py-0.5 min-w-[1.25rem] text-center">
                           {item.count}
                         </span>
@@ -87,7 +88,7 @@ export function AppSidebar() {
                   <SidebarMenuButton asChild>
                     <NavLink to={item.url} end activeClassName="bg-sidebar-accent text-sidebar-accent-foreground">
                       <item.icon className="mr-2 h-4 w-4" />
-                      {!collapsed && <span>{item.title}</span>}
+                      {showLabels && <span>{item.title}</span>}
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -99,7 +100,7 @@ export function AppSidebar() {
         {project && (
           <SidebarGroup>
             <SidebarGroupLabel>
-              {!collapsed ? (
+              {showLabels ? (
                 <span className="flex items-center gap-1 truncate">
                   <ChevronRight className="h-3 w-3" />
                   {project.metadata.name || 'New Trip'}
@@ -113,7 +114,7 @@ export function AppSidebar() {
                     <SidebarMenuButton asChild>
                       <NavLink to={item.url} activeClassName="bg-sidebar-accent text-sidebar-accent-foreground">
                         <item.icon className="mr-2 h-4 w-4" />
-                        {!collapsed && <span>{item.title}</span>}
+                        {showLabels && <span>{item.title}</span>}
                       </NavLink>
                     </SidebarMenuButton>
                   </SidebarMenuItem>

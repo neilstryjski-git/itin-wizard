@@ -258,7 +258,7 @@ export default function Dashboard() {
                       />
 
                       {/* Archive button for finalized trips (owner only) */}
-                      {isFinalized && !isArchived && isOwner && (
+                      {isFinalized && !isArchived && isOwner && !isLocked && (
                         <Button
                           variant="ghost"
                           size="icon"

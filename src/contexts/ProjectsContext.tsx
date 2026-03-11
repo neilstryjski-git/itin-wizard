@@ -6,10 +6,14 @@ import { TravelProject } from '@/types/project';
 interface ProjectsContextType {
   projects: TravelProject[];
   isLoading: boolean;
+  isError: boolean;
   addProject: (p: TravelProject) => void;
   updateProject: (id: string, updater: (p: TravelProject) => TravelProject) => void;
   deleteProject: (id: string) => void;
   getProject: (id: string) => TravelProject | undefined;
+  finalizeProject: (id: string) => void;
+  archiveProject: (id: string) => void;
+  restoreProject: (id: string) => void;
   email: string | null;
   setEmail: (email: string) => void;
   clearEmail: () => void;

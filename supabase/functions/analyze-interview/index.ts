@@ -162,7 +162,7 @@ serve(async (req) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.0-flash-exp",
+        model: "google/gemini-2.0-flash",
         messages: userMessages,
         tools: [toolDef],
         tool_choice: { type: "function", function: { name: "return_analysis" } },

@@ -1,20 +1,57 @@
 import { useNavigate } from 'react-router-dom';
-import { Plus, Plane, Trash2, MapPin, Users, Calendar, Mail } from 'lucide-react';
+import { useState, useRef } from 'react';
+import { Plus, Plane, Trash2, MapPin, Users, Calendar, Mail, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { useProjectsContext } from '@/contexts/ProjectsContext';
 import { createNewProject } from '@/types/project';
 import { CollaboratorsDialog } from '@/components/CollaboratorsDialog';
 
 export default function Dashboard() {
-  const { projects, addProject, deleteProject, email } = useProjectsContext();
+  const { projects, addProject, deleteProject, updateProject, email, isLoading } = useProjectsContext();
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
 
-  const handleNewProject = () => {
-    const p = createNewProject();
-    addProject(p);
-    navigate(`/project/${p.project_id}/interview`);
+  console.log(`[Dashboard] Rendering with ${projects.length} projects for ${email}`);
+
+  const startEditing = (id: string, name: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingId(id);
+    setEditingName(name);
+    setTimeout(() => inputRef.current?.select(), 0);
   };
+
+  const commitEdit = (id: string) => {
+    const trimmed = editingName.trim();
+    if (trimmed) {
+      updateProject(id, p => ({ ...p, metadata: { ...p.metadata, name: trimmed } }));
+    }
+    setEditingId(null);
+  };
+
+  const handleNewProject = () => {
+    console.log("[Dashboard] Attempting to create new project. Email state:", email);
+    if (!email) {
+      console.error("[Dashboard] Cannot create project: No email identity found.");
+      return;
+    }
+    const p = createNewProject();
+    console.log("[Dashboard] Calling addProject with:", p.project_id);
+    addProject(p, () => {
+      navigate(`/project/${p.project_id}/interview`);
+    });
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[50vh]">
+        <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 md:p-10 max-w-5xl mx-auto fade-in">
@@ -43,24 +80,52 @@ export default function Dashboard() {
             const projectOwnerEmail = p.owner_email?.trim().toLowerCase();
             const isOwner = projectOwnerEmail === currentEmail;
             const collaboratorsCount = p.metadata.collaborators?.length || 0;
+            const isTestTrip = p.metadata.name?.startsWith('TEST:') || p.metadata.name?.endsWith(' TEST');
 
             return (
               <Card
                 key={p.project_id}
-                className="card-hover cursor-pointer group relative"
+                className={`card-hover cursor-pointer group relative ${isTestTrip ? 'border-primary/20 bg-primary/[0.02]' : ''}`}
                 style={{ animationDelay: `${i * 60}ms` }}
-                onClick={() => navigate(`/project/${p.project_id}/itinerary`)}
+                onClick={() => {
+                  const target = p.phase_1_requirements.completed ? 'itinerary' : 'interview';
+                  navigate(`/project/${p.project_id}/${target}`);
+                }}
               >
                 <CardContent className="p-5">
                   <div className="flex items-start justify-between">
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <h3 className="font-heading font-semibold text-lg truncate">
-                          {p.metadata.name || 'Untitled Trip'}
-                        </h3>
-                        {!isOwner && (
-                          <span className="text-[10px] uppercase font-bold text-primary px-1.5 py-0.5 bg-primary/10 border border-primary/20 rounded">Shared</span>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {editingId === p.project_id ? (
+                          <Input
+                            ref={inputRef}
+                            value={editingName}
+                            onChange={e => setEditingName(e.target.value)}
+                            onBlur={() => commitEdit(p.project_id)}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') { e.preventDefault(); commitEdit(p.project_id); }
+                              if (e.key === 'Escape') { setEditingId(null); }
+                            }}
+                            onClick={e => e.stopPropagation()}
+                            className="font-heading font-semibold text-lg h-auto py-0 px-1 border-0 border-b rounded-none focus-visible:ring-0 focus-visible:border-primary w-48"
+                          />
+                        ) : (
+                          <h3
+                            className="font-heading font-semibold text-lg truncate cursor-text group/name flex items-center gap-1"
+                            onClick={e => startEditing(p.project_id, p.metadata.name || '', e)}
+                          >
+                            {p.metadata.name || 'Untitled Trip'}
+                            <Pencil className="h-3 w-3 opacity-0 group-hover/name:opacity-40 transition-opacity flex-shrink-0" />
+                          </h3>
                         )}
+                        <div className="flex gap-1.5">
+                          {isTestTrip && (
+                            <span className="text-[10px] uppercase font-bold text-muted-foreground px-1.5 py-0.5 bg-muted border border-muted-foreground/20 rounded">Demo</span>
+                          )}
+                          {!isOwner && (
+                            <span className="text-[10px] uppercase font-bold text-primary px-1.5 py-0.5 bg-primary/10 border border-primary/20 rounded">Shared</span>
+                          )}
+                        </div>
                       </div>
                       <div className="flex items-center gap-1 text-sm text-muted-foreground mt-1">
                         <MapPin className="h-3.5 w-3.5" />

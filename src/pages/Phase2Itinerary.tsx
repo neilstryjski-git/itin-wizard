@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 import {
   Pencil, Save, X, AlertTriangle, Plus, Trash2, Plane, Hotel,
   MapPin, Clock, Link as LinkIcon, FileText, ArrowRight, Loader2, Sparkles, Check,
-  Upload, Image, File,
+  Upload, Image, File, ShieldCheck,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -39,11 +39,23 @@ const EVENT_LABELS: Record<string, string> = {
 
 export default function Phase2Itinerary() {
   const { projectId } = useParams<{ projectId: string }>();
-  const { getProject, updateProject, email } = useProjectsContext();
+  const { getProject, updateProject, email, finalizeProject } = useProjectsContext();
   const navigate = useNavigate();
   const project = getProject(projectId!);
   const isOwner = project?.owner_email?.trim().toLowerCase() === email?.trim().toLowerCase();
+  const isFinalized = project?.metadata.is_finalized;
+
+  const handleFinalize = () => {
+    if (!projectId) return;
+    finalizeProject(projectId);
+    toast.success("Trip finalized! Moving to official records.");
+    navigate('/finalized');
+  };
+
   const [rawInput, setRawInput] = useState(project?.phase_2_itinerary.rawInput || '');
+  const [editingName, setEditingName] = useState(false);
+  const [nameValue, setNameValue] = useState('');
+  const nameInputRef = useRef<HTMLInputElement>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingSummary, setEditingSummary] = useState(false);
   const [editForm, setEditForm] = useState<Partial<ItineraryEvent>>({});
@@ -442,7 +454,31 @@ export default function Phase2Itinerary() {
         <div>
           <h2 className="font-heading text-2xl font-bold">Itinerary</h2>
           <div className="flex items-center gap-2">
-            <p className="text-sm text-muted-foreground">{project.metadata.name || 'Untitled Trip'}</p>
+            {editingName ? (
+              <Input
+                ref={nameInputRef}
+                value={nameValue}
+                onChange={e => setNameValue(e.target.value)}
+                onBlur={() => {
+                  const trimmed = nameValue.trim();
+                  if (trimmed) updateProject(projectId!, p => ({ ...p, metadata: { ...p.metadata, name: trimmed } }));
+                  setEditingName(false);
+                }}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') { e.preventDefault(); nameInputRef.current?.blur(); }
+                  if (e.key === 'Escape') setEditingName(false);
+                }}
+                className="h-6 text-sm py-0 px-1 border-0 border-b rounded-none focus-visible:ring-0 focus-visible:border-primary w-48 text-muted-foreground"
+              />
+            ) : (
+              <p
+                className="text-sm text-muted-foreground cursor-text group/name flex items-center gap-1"
+                onClick={() => { setNameValue(project.metadata.name || ''); setEditingName(true); setTimeout(() => nameInputRef.current?.select(), 0); }}
+              >
+                {project.metadata.name || 'Untitled Trip'}
+                <Pencil className="h-2.5 w-2.5 opacity-0 group-hover/name:opacity-40 transition-opacity flex-shrink-0" />
+              </p>
+            )}
             {!isOwner && (
                <span className="text-[10px] uppercase font-bold text-primary px-1.5 py-0.5 bg-primary/10 border border-primary/20 rounded">Shared</span>
             )}
@@ -450,6 +486,16 @@ export default function Phase2Itinerary() {
         </div>
         <div className="flex gap-2">
           <CollaboratorsDialog project={project} />
+          {!isFinalized && isOwner && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleFinalize}
+              className="gap-1 border-primary/30 text-primary hover:bg-primary/5"
+            >
+              <ShieldCheck className="h-3 w-3" /> Finalize
+            </Button>
+          )}
           <Button 
             variant="outline" 
             size="sm" 

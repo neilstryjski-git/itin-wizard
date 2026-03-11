@@ -19,9 +19,9 @@ Enable users to automatically back up trip data to Google Drive and link existin
 - [x] **T9.3: Provision Google Cloud Project**
   - **Assignee**: 👤 User
   - **Result**: Project created, Drive API enabled, and OAuth credentials generated. Frontend ID and Backend Secret are now in place.
-- [ ] **T9.4: Setup Edge Function Proxy**
+- [x] **T9.4: Setup Edge Function Proxy**
   - **Assignee**: ♊ Gemini
-  - **Task**: Create `supabase/functions/gdrive-proxy` to handle token exchange.
+  - **Result**: Implemented `supabase/functions/gdrive-proxy` for token exchange/refresh and `user_cloud_auth` table for token storage.
 
 ### Phase 3: UI/UX
 - [ ] **T9.5: GDrive Connection Toggle**

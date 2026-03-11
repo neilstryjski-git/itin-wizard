@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Download, ArrowLeft, Plus, X, Pencil, Check, Link as LinkIcon,
@@ -27,6 +27,9 @@ export default function ExportPreview() {
   const navigate = useNavigate();
   const project = getProject(projectId!);
 
+  const [editingTripName, setEditingTripName] = useState(false);
+  const [tripNameValue, setTripNameValue] = useState('');
+  const tripNameRef = useRef<HTMLInputElement>(null);
   const [editingEvent, setEditingEvent] = useState<string | null>(null);
   const [isUpdatingAI, setIsUpdatingAI] = useState<string | null>(null);
   const [parsingEventId, setParsingEventId] = useState<string | null>(null);
@@ -523,7 +526,31 @@ export default function ExportPreview() {
       {/* Document Preview */}
       <div className="bg-background border rounded-lg shadow-sm p-6 md:p-10 space-y-1">
         {/* Title Block */}
-        <h1 className="text-xl font-bold mb-1">{project.metadata.name || 'Travel Itinerary'}</h1>
+        {editingTripName ? (
+          <Input
+            ref={tripNameRef}
+            value={tripNameValue}
+            onChange={e => setTripNameValue(e.target.value)}
+            onBlur={() => {
+              const trimmed = tripNameValue.trim();
+              if (trimmed) updateProject(projectId!, p => ({ ...p, metadata: { ...p.metadata, name: trimmed } }));
+              setEditingTripName(false);
+            }}
+            onKeyDown={e => {
+              if (e.key === 'Enter') { e.preventDefault(); tripNameRef.current?.blur(); }
+              if (e.key === 'Escape') setEditingTripName(false);
+            }}
+            className="text-xl font-bold h-auto py-0 px-1 border-0 border-b rounded-none focus-visible:ring-0 focus-visible:border-primary mb-1 w-full"
+          />
+        ) : (
+          <h1
+            className="text-xl font-bold mb-1 cursor-text group/name flex items-center gap-1.5"
+            onClick={() => { setTripNameValue(project.metadata.name || ''); setEditingTripName(true); setTimeout(() => tripNameRef.current?.select(), 0); }}
+          >
+            {project.metadata.name || 'Travel Itinerary'}
+            <Pencil className="h-3.5 w-3.5 opacity-0 group-hover/name:opacity-40 transition-opacity flex-shrink-0" />
+          </h1>
+        )}
         {project.metadata.travelers.length > 0 && (
           <div className="text-sm">
             <span className="font-semibold">Travelers: </span>

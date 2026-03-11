@@ -13,6 +13,9 @@ export default defineConfig(({ mode }) => ({
       overlay: false,
     },
   },
+  preview: {
+    port: 8080,
+  },
   plugins: [
     react(),
     VitePWA({

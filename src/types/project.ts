@@ -77,6 +77,10 @@ export interface TravelProject {
     createdAt: string;
     updatedAt: string;
     status?: 'active' | 'archived';
+    is_finalized?: boolean;
+    is_locked?: boolean;
+    version?: number;
+    finalized_at?: string;
   };
   phase_1_requirements: {
     completed: boolean;
@@ -107,6 +111,9 @@ export const createNewProject = (): TravelProject => ({
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     status: 'active',
+    is_finalized: false,
+    is_locked: false,
+    version: 0,
   },
   phase_1_requirements: {
     completed: false,

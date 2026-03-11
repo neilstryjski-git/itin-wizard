@@ -23,7 +23,9 @@ See **AI_WOW.md** for interaction protocols and rules of engagement.
 | ID | Feature | Status | Owner | Plan |
 | :--- | :--- | :--- | :--- | :--- |
 | 🟢 Done | **F14: Minimalist PDF Template** | ✅ Done | 🤖 Claude | [`f14-pdf-aesthetic.md`](docs/plans/f14-pdf-aesthetic.md) |
-| **F9** | **Cloud Vault (GDrive Sync)** | 🧠 Brainstorming | ♊ Gemini | [`f9-cloud-vault.md`](docs/plans/f9-cloud-vault.md) |
+| **F9** | **Cloud Vault (GDrive Sync)** | 🟡 In Progress | 🤖 Claude | [`f9-cloud-vault.md`](docs/plans/f9-cloud-vault.md) |
+| **F16** | **The Travel Library** | 🟡 In Progress | ♊ Gemini | [`f16-finalize-trip.md`](docs/plans/f16-finalize-trip.md) |
+| **F15** | **Test Trip for New Users** | ✅ Done | ♊ Gemini | *Direct Implementation* |
 | **F13** | **Gemini Native Migration** | 📅 Planned | ♊ Gemini | *Planned* |
 | **F8** | **QR Code Detection** | 📅 Backlog | ♊ Gemini | *Not Started* |
 
@@ -32,6 +34,9 @@ See **AI_WOW.md** for interaction protocols and rules of engagement.
 ## 🟢 Resolved Features (History)
 | Date | ID | Feature | Resolution |
 | :--- | :--- | :--- | :--- |
+| 2026-03-09 | F15 | Test Trip for New Users | Automatically create a "Belize Family Adventure 2026 TEST" trip for new users, personalized with their identity as the sole traveler and re-assigned packing items. |
+| 2026-03-09 | F9 | GDrive Infrastructure | Implemented `user_cloud_auth` table and `gdrive-proxy` Edge Function for OAuth token management. |
+| 2026-03-09 | B8 | Model Name Fix | Corrected typo `gemini-2.5-flash` to `gemini-2.0-flash` in `parse-itinerary` function. |
 | 2026-03-09 | F14 | Minimalist PDF Template | Option C implemented: plain theme, coloured bottom-border headers, 2mm accent pips, muted palette, left-rule summary block, page numbers. |
 | 2026-03-08 | F3 | PDF Export Styles | Enhanced with event-type colour-coded headers and refined typography. Superseded by F14 minimalist refactor. |
 | 2026-03-08 | F5 | Multi-Event Doc Split | Multiple events in docs are now appended to the timeline. |

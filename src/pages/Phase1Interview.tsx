@@ -23,7 +23,7 @@ interface ExtractedData {
 
 export default function Phase1Interview() {
   const { projectId } = useParams<{ projectId: string }>();
-  const { getProject, updateProject } = useProjectsContext();
+  const { getProject, updateProject, isLoading } = useProjectsContext();
   const navigate = useNavigate();
   const { toast } = useToast();
   const project = getProject(projectId!);
@@ -68,8 +68,13 @@ export default function Phase1Interview() {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
   }, [messages]);
 
+  useEffect(() => {
+    if (!project && !isLoading) {
+      navigate('/');
+    }
+  }, [project, isLoading, navigate]);
+
   if (!project) {
-    navigate('/');
     return null;
   }
 

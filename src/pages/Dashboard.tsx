@@ -25,22 +25,23 @@ export default function Dashboard() {
   const inputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   const location = useLocation();
+  const hasRedirectedRef = useRef(false);
 
   // Dynamic Home Route Redirection
   useEffect(() => {
-    if (isLoading || projects.length === 0) return;
+    if (isLoading || projects.length === 0 || hasRedirectedRef.current) return;
     
     // Only redirect if we are on the base root path
     if (location.pathname === '/') {
       const hasFinalized = projects.some(p => p.metadata.is_finalized === true && p.metadata.status !== 'archived');
-      const hasDrafts = projects.some(p => p.metadata.is_finalized !== true && p.metadata.status !== 'archived');
       
       if (hasFinalized) {
-        console.log("[Dashboard] Auto-redirecting to /finalized (found finalized trips)");
+        hasRedirectedRef.current = true;
+        console.log("[Dashboard] Initial auto-redirect to /finalized");
         navigate('/finalized', { replace: true });
-      } else if (!hasDrafts) {
-        // This handles cases where only archived trips exist - stay on drafts for creation
-        console.log("[Dashboard] Staying on / drafts (no active drafts or finalized found)");
+      } else {
+        // Mark as redirected even if we stayed on drafts to prevent later jumps
+        hasRedirectedRef.current = true;
       }
     }
   }, [isLoading, projects, location.pathname, navigate]);
@@ -127,11 +128,15 @@ export default function Dashboard() {
           <h1 className="text-3xl font-heading font-bold">{pageTitle}</h1>
           <p className="text-muted-foreground mt-1">{pageSubtitle}</p>
         </div>
-        {filter === 'drafts' && (
+        {filter === 'drafts' ? (
           <Button onClick={handleNewProject} size="lg" className="gap-2">
             <Plus className="h-4 w-4" /> New Trip
           </Button>
-        )}
+        ) : filter === 'finalized' ? (
+          <Button disabled variant="outline" size="lg" className="gap-2 opacity-50 cursor-not-allowed border-dashed bg-muted/20">
+            <Plus className="h-4 w-4" /> New Trip (Go to Drafts)
+          </Button>
+        ) : null}
       </div>
 
       {filteredProjects.length === 0 ? (
@@ -302,8 +307,8 @@ export default function Dashboard() {
                         </Button>
                       )}
 
-                      {/* Delete button */}
-                      {isOwner && (
+                      {/* Delete button (Drafts only) */}
+                      {isOwner && !isFinalized && !isArchived && (
                         <Button
                           variant="ghost"
                           size="icon"

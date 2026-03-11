@@ -526,76 +526,86 @@ export default function Phase2Itinerary() {
       )}
 
       {/* Step 1: Upload Documents */}
-      <Card className={`mb-6 transition-opacity ${editingId ? 'opacity-50 pointer-events-none' : ''}`}>
-        <CardContent className="p-4 space-y-3">
-          <div className="flex items-center gap-2 text-sm font-medium">
-            <Upload className="h-4 w-4 text-muted-foreground" />
-            Step 1: Upload booking documents
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Upload PDFs, screenshots, or images of your booking confirmations. AI will extract all events automatically.
-          </p>
-          <FileDropZone onFilesAdded={handleDocsAdded} />
-          {uploadedDocs.length > 0 && (
-            <div className="space-y-2">
-              <div className="flex flex-wrap gap-2">
-                {uploadedDocs.map(doc => {
-                  const Icon = doc.type.startsWith('image/') ? Image : doc.type.includes('pdf') ? FileText : File;
-                  return (
-                    <div key={doc.id} className="flex items-center gap-1.5 bg-secondary rounded-md px-2 py-1 text-xs group">
-                      <Icon className="h-3 w-3 text-muted-foreground shrink-0" />
-                      <span className="truncate max-w-[150px]">{doc.name}</span>
-                      <button
-                        onClick={() => removeDoc(doc.id)}
-                        className="ml-0.5 text-destructive hover:text-destructive"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </div>
-                  );
-                })}
+      {!isLocked ? (
+        <>
+          <Card className={`mb-6 transition-opacity ${editingId ? 'opacity-50 pointer-events-none' : ''}`}>
+            <CardContent className="p-4 space-y-3">
+              <div className="flex items-center gap-2 text-sm font-medium">
+                <Upload className="h-4 w-4 text-muted-foreground" />
+                Step 1: Upload booking documents
               </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+              <p className="text-xs text-muted-foreground">
+                Upload PDFs, screenshots, or images of your booking confirmations. AI will extract all events automatically.
+              </p>
+              <FileDropZone onFilesAdded={handleDocsAdded} />
+              {uploadedDocs.length > 0 && (
+                <div className="space-y-2">
+                  <div className="flex flex-wrap gap-2">
+                    {uploadedDocs.map(doc => {
+                      const Icon = doc.type.startsWith('image/') ? Image : doc.type.includes('pdf') ? FileText : File;
+                      return (
+                        <div key={doc.id} className="flex items-center gap-1.5 bg-secondary rounded-md px-2 py-1 text-xs group">
+                          <Icon className="h-3 w-3 text-muted-foreground shrink-0" />
+                          <span className="truncate max-w-[150px]">{doc.name}</span>
+                          <button
+                            onClick={() => removeDoc(doc.id)}
+                            className="ml-0.5 text-destructive hover:text-destructive"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
-      {/* Optional: Paste text */}
-      <Card className={`mb-6 transition-opacity ${editingId ? 'opacity-50 pointer-events-none' : ''}`}>
-        <CardContent className="p-4 space-y-3">
-          <div className="flex items-center gap-2 text-sm font-medium">
-            <FileText className="h-4 w-4 text-muted-foreground" />
-            Or paste reservation details
+          {/* Optional: Paste text */}
+          <Card className={`mb-6 transition-opacity ${editingId ? 'opacity-50 pointer-events-none' : ''}`}>
+            <CardContent className="p-4 space-y-3">
+              <div className="flex items-center gap-2 text-sm font-medium">
+                <FileText className="h-4 w-4 text-muted-foreground" />
+                Or paste reservation details
+              </div>
+              <Textarea
+                value={rawInput}
+                onChange={e => setRawInput(e.target.value)}
+                placeholder="Paste your booking confirmations, flight details, hotel reservations here..."
+                rows={3}
+                disabled={isParsing}
+              />
+            </CardContent>
+          </Card>
+
+          {/* Parse button */}
+          <div className="mb-8">
+            <Button
+              onClick={parseDocuments}
+              disabled={isParsing || !!editingId || (uploadedDocs.length === 0 && !rawInput.trim())}
+              className="w-full gap-2"
+            >
+              {isParsing ? (
+                <><Loader2 className="h-4 w-4 animate-spin" /> Analyzing documents...</>
+              ) : (
+                <><Sparkles className="h-4 w-4" /> Parse {uploadedDocs.length > 0 ? `${uploadedDocs.length} document(s)` : 'text'} with AI</>
+              )}
+            </Button>
+            {editingId && (
+              <p className="text-[10px] text-center text-muted-foreground mt-2 italic">
+                Save or cancel your current edit to parse more documents.
+              </p>
+            )}
           </div>
-          <Textarea
-            value={rawInput}
-            onChange={e => setRawInput(e.target.value)}
-            placeholder="Paste your booking confirmations, flight details, hotel reservations here..."
-            rows={3}
-            disabled={isParsing}
-          />
-        </CardContent>
-      </Card>
-
-      {/* Parse button */}
-      <div className="mb-8">
-        <Button
-          onClick={parseDocuments}
-          disabled={isParsing || !!editingId || (uploadedDocs.length === 0 && !rawInput.trim())}
-          className="w-full gap-2"
-        >
-          {isParsing ? (
-            <><Loader2 className="h-4 w-4 animate-spin" /> Analyzing documents...</>
-          ) : (
-            <><Sparkles className="h-4 w-4" /> Parse {uploadedDocs.length > 0 ? `${uploadedDocs.length} document(s)` : 'text'} with AI</>
-          )}
-        </Button>
-        {editingId && (
-          <p className="text-[10px] text-center text-muted-foreground mt-2 italic">
-            Save or cancel your current edit to parse more documents.
-          </p>
-        )}
-      </div>
+        </>
+      ) : (
+        <div className="mb-8 p-10 border-2 border-dashed rounded-lg flex flex-col items-center justify-center text-muted-foreground bg-muted/5">
+          <ShieldCheck className="h-12 w-12 mb-3 opacity-20" />
+          <p className="font-heading font-semibold text-lg">Official Record Locked</p>
+          <p className="text-sm">Unlock from the dashboard to make changes to this itinerary.</p>
+        </div>
+      )}
 
       {/* Preview Step */}
       {previewEvents.length > 0 && (
@@ -848,6 +858,7 @@ export default function Phase2Itinerary() {
           <SortableList
             items={timelineEntries.map(e => e.entryId)}
             onReorder={reorderEntries}
+            isLocked={isLocked}
           >
             {timelineEntries.map((entry, i) => {
               const { event, displayType, displayDate, displayTime, isBookend } = entry;
@@ -855,14 +866,14 @@ export default function Phase2Itinerary() {
               const isEditing = editingId === event.id;
               const missing = hasMissing(event);
               const bookendLabel = EVENT_LABELS[displayType] || displayType;
-              const isDraggable = true;
+              const isDraggable = !isLocked;
 
               const cardContent = (
                 <Card 
                   ref={isEditing ? editingCardRef : undefined}
                   className={`relative slide-up transition-all duration-300 ${
                     isEditing ? 'border-primary ring-2 ring-primary/20 shadow-lg scale-[1.02]' : ''
-                  }`}
+                  } ${isLocked ? 'opacity-95' : ''}`}
                   style={{ animationDelay: `${i * 40}ms` }}
                 >
                   <CardContent className="p-4">
@@ -963,14 +974,16 @@ export default function Phase2Itinerary() {
                             </p>
                           )}
                         </div>
-                        <div className="flex gap-1 shrink-0">
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => startEdit(event)} disabled={!!parsingEventId}>
-                            <Pencil className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => deleteEvent(event.id)} disabled={!!parsingEventId}>
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
+                        {!isLocked && (
+                          <div className="flex gap-1 shrink-0">
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => startEdit(event)} disabled={!!parsingEventId}>
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => deleteEvent(event.id)} disabled={!!parsingEventId}>
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        )}
                       </div>
                     )}
                   </CardContent>
@@ -979,12 +992,12 @@ export default function Phase2Itinerary() {
 
               if (isDraggable) {
                 return (
-                  <SortableItem key={entry.entryId} id={entry.entryId}>
+                  <SortableItem key={entry.entryId} id={entry.entryId} isLocked={isLocked}>
                     {cardContent}
                   </SortableItem>
                 );
               }
-              return <div key={entry.entryId} className="ml-5">{cardContent}</div>;
+              return <div key={entry.entryId} className={isLocked ? "" : "ml-5"}>{cardContent}</div>;
             })}
           </SortableList>
         )}

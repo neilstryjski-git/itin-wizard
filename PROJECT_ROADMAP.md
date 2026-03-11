@@ -35,6 +35,7 @@ See **AI_WOW.md** for interaction protocols and rules of engagement.
 ## 🟢 Resolved Features (History)
 | Date | ID | Feature | Resolution |
 | :--- | :--- | :--- | :--- |
+| 2026-03-11 | B9 | Archive Button on Drafts | Removed the "Archive" action from draft trips in the Dashboard; drafts must now be Finalized before they can be Archived. |
 | 2026-03-09 | F15 | Test Trip for New Users | Automatically create a "Belize Family Adventure 2026 TEST" trip for new users, personalized with their identity as the sole traveler and re-assigned packing items. |
 | 2026-03-09 | F9 | GDrive Infrastructure | Implemented `user_cloud_auth` table and `gdrive-proxy` Edge Function for OAuth token management. |
 | 2026-03-09 | B8 | Model Name Fix | Corrected typo `gemini-2.5-flash` to `gemini-2.0-flash` in `parse-itinerary` function. |

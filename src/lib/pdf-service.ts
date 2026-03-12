@@ -4,6 +4,7 @@ import { TravelProject } from '@/types/project';
 import {
   formatDate, buildEventTable, getEventTitlePdf, stripEmoji, buildTimeline, googleMapsUrl
 } from './itinerary-utils';
+import { FEATURE_FLAGS } from './feature-flags';
 
 /**
  * PDF Generation Service
@@ -226,7 +227,7 @@ export async function downloadPdf(project: TravelProject) {
   }
 
   // Final Checklist
-  if (project.phase_1_requirements.checklist.length > 0) {
+  if (FEATURE_FLAGS.REQUIREMENTS_SECTION_ENABLED && project.phase_1_requirements.checklist.length > 0) {
     if (y > 240) { doc.addPage(); y = 15; }
     doc.setFillColor(70, 105, 175);
     doc.rect(margin, y - 3.5, 2, 7, 'F');
@@ -260,7 +261,7 @@ export async function downloadPdf(project: TravelProject) {
   }
 
   // Packing List
-  if (project.phase_3_packing.items.length > 0) {
+  if (FEATURE_FLAGS.PACKING_LIST_ENABLED && project.phase_3_packing.items.length > 0) {
     if (y > 240) { doc.addPage(); y = 15; }
     doc.setFillColor(70, 105, 175);
     doc.rect(margin, y - 3.5, 2, 7, 'F');

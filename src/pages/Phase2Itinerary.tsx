@@ -19,6 +19,7 @@ import { buildTimeline, normalizeDate, eventsFromTimeline, TimelineEntry } from 
 import { SortableList, SortableItem, arrayMove } from '@/components/SortableEventList';
 import { CollaboratorsDialog } from '@/components/CollaboratorsDialog';
 import { TripSettingsDialog } from '@/components/TripSettingsDialog';
+import { FEATURE_FLAGS } from '@/lib/feature-flags';
 
 const EVENT_ICONS: Record<string, any> = {
   'flight': Plane,
@@ -529,14 +530,16 @@ export default function Phase2Itinerary() {
               <Plus className="h-3 w-3" /> Add Event
             </Button>
           )}
-          <Button
-            size="sm"
-            className="gap-1"
-            onClick={() => navigate(`/project/${projectId}/packing`)}
-            disabled={!!editingId}
-          >
-            <ArrowRight className="h-3 w-3" /> Packing
-          </Button>
+          {FEATURE_FLAGS.PACKING_LIST_ENABLED && (
+            <Button
+              size="sm"
+              className="gap-1"
+              onClick={() => navigate(`/project/${projectId}/packing`)}
+              disabled={!!editingId}
+            >
+              <ArrowRight className="h-3 w-3" /> Packing
+            </Button>
+          )}
         </div>
       </div>
 
@@ -628,6 +631,67 @@ export default function Phase2Itinerary() {
           <p className="font-heading font-semibold text-lg">Official Record Locked</p>
           <p className="text-sm">Unlock from the dashboard to make changes to this itinerary.</p>
         </div>
+      )}
+
+      {/* Travel Requirements Section (Checklist from Phase 1) */}
+      {FEATURE_FLAGS.REQUIREMENTS_SECTION_ENABLED && project.phase_1_requirements.checklist.length > 0 && (
+        <Card className="mb-8 border-primary/20 bg-primary/5">
+          <CardContent className="p-4 space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-primary/10 rounded-full">
+                  <ShieldCheck className="h-4 w-4 text-primary" />
+                </div>
+                <h2 className="font-heading font-semibold text-lg">Travel Requirements</h2>
+              </div>
+              {!isLocked && (
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="text-xs h-7 gap-1 text-primary hover:bg-primary/10"
+                  onClick={() => navigate(`/project/${projectId}/interview`)}
+                >
+                  <Pencil className="h-3 w-3" /> Edit
+                </Button>
+              )}
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
+              {project.phase_1_requirements.checklist.map(item => (
+                <div key={item.id} className="flex items-start gap-2 py-1 border-b border-primary/5 last:border-0">
+                  <input
+                    type="checkbox"
+                    checked={item.checked}
+                    onChange={() => {
+                      updateProject(projectId!, p => ({
+                        ...p,
+                        phase_1_requirements: {
+                          ...p.phase_1_requirements,
+                          checklist: p.phase_1_requirements.checklist.map(c =>
+                            c.id === item.id ? { ...c, checked: !c.checked } : c
+                          ),
+                        },
+                      }));
+                    }}
+                    className="mt-1 h-3.5 w-3.5 rounded accent-primary cursor-pointer shrink-0"
+                    disabled={isLocked}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-xs font-medium leading-tight ${item.checked ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
+                      {item.title}
+                    </p>
+                    {item.url && (
+                      <a href={item.url} target="_blank" rel="noopener noreferrer" 
+                        className="inline-flex items-center gap-0.5 text-[10px] text-primary hover:underline mt-0.5">
+                        <LinkIcon className="h-2 w-2" /> {item.url_label || 'Link'}
+                      </a>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* Preview Step */}

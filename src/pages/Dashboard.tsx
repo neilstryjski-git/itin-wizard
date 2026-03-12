@@ -259,8 +259,8 @@ export default function Dashboard() {
                     </div>
 
                     <div className="flex gap-1" onClick={e => e.stopPropagation()}>
-                      {/* Lock/Unlock toggle for finalized trips (owner only) */}
-                      {isFinalized && isOwner && (
+                      {/* Lock/Unlock toggle for finalized trips (Collaborators allowed) */}
+                      {isFinalized && (
                         <Button
                           variant="ghost"
                           size="icon"

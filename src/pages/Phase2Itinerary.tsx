@@ -497,15 +497,17 @@ export default function Phase2Itinerary() {
               <ShieldCheck className="h-3 w-3" /> Finalize
             </Button>
           )}
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={addBlankEvent} 
-            className="gap-1"
-            disabled={!!editingId}
-          >
-            <Plus className="h-3 w-3" /> Add Event
-          </Button>
+          {!isLocked && (
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={addBlankEvent} 
+              className="gap-1"
+              disabled={!!editingId}
+            >
+              <Plus className="h-3 w-3" /> Add Event
+            </Button>
+          )}
           <Button
             size="sm"
             className="gap-1"

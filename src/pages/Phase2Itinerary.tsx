@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 import {
   Pencil, Save, X, AlertTriangle, Plus, Trash2, Plane, Hotel,
   MapPin, Clock, Link as LinkIcon, FileText, ArrowRight, Loader2, Sparkles, Check,
-  Upload, Image, File, ShieldCheck, LockOpen,
+  Upload, Image, File, ShieldCheck, LockOpen, Download, Settings,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,6 +18,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { buildTimeline, normalizeDate, eventsFromTimeline, TimelineEntry } from '@/lib/itinerary-utils';
 import { SortableList, SortableItem, arrayMove } from '@/components/SortableEventList';
 import { CollaboratorsDialog } from '@/components/CollaboratorsDialog';
+import { TripSettingsDialog } from '@/components/TripSettingsDialog';
 
 const EVENT_ICONS: Record<string, any> = {
   'flight': Plane,
@@ -45,12 +46,27 @@ export default function Phase2Itinerary() {
   const isOwner = project?.owner_email?.trim().toLowerCase() === email?.trim().toLowerCase();
   const isFinalized = project?.metadata.is_finalized;
   const isLocked = project?.metadata.is_locked !== false;
+  const [isExporting, setIsExporting] = useState(false);
 
   const handleFinalize = () => {
     if (!projectId) return;
     finalizeProject(projectId);
     toast.success("Trip finalized! Moving to official records.");
     navigate('/finalized');
+  };
+
+  const handleDownloadPdf = async () => {
+    if (!project) return;
+    setIsExporting(true);
+    try {
+      const { downloadPdf } = await import('@/lib/pdf-service');
+      await downloadPdf(project);
+    } catch (err) {
+      console.error("Failed to generate PDF:", err);
+      toast.error("Failed to generate PDF.");
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   const [rawInput, setRawInput] = useState(project?.phase_2_itinerary.rawInput || '');
@@ -486,7 +502,12 @@ export default function Phase2Itinerary() {
           </div>
         </div>
         <div className="flex gap-2">
+          <TripSettingsDialog project={project} />
           <CollaboratorsDialog project={project} />
+          <Button variant="outline" size="sm" onClick={handleDownloadPdf} disabled={isExporting} className="gap-1">
+            {isExporting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />}
+            PDF
+          </Button>
           {!isFinalized && isOwner && (
             <Button
               variant="outline"
@@ -1168,6 +1189,24 @@ function EditForm({
       <div>
         <label className="text-xs font-medium text-muted-foreground">Confirmation Code</label>
         <Input value={form.confirmationCode || ''} onChange={e => setForm({ ...form, confirmationCode: e.target.value })} onFocus={e => e.target.select()} />
+      </div>
+      <div>
+        <label className="text-xs font-medium text-muted-foreground">Map / Location Link (Optional)</label>
+        <div className="relative mt-1">
+          <LinkIcon className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input 
+            className="pl-9" 
+            placeholder="https://google.com/maps/..." 
+            value={form.fieldUrls?.['location'] || ''} 
+            onChange={e => setForm({ 
+              ...form, 
+              fieldUrls: { ...(form.fieldUrls || {}), location: e.target.value } 
+            })} 
+          />
+        </div>
+        <p className="text-[10px] text-muted-foreground mt-1">
+          Custom URL for this location. If empty, the PDF will auto-generate a Google Maps link.
+        </p>
       </div>
       <div>
         <label className="text-xs font-medium text-muted-foreground">Notes</label>

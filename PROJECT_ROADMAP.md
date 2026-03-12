@@ -35,6 +35,7 @@ See **AI_WOW.md** for interaction protocols and rules of engagement.
 ## 🟢 Resolved Features (History)
 | Date | ID | Feature | Resolution |
 | :--- | :--- | :--- | :--- |
+| 2026-03-11 | F16 | Architectural Merge | Merged Export Preview into Itinerary page. Added `pdf-service.ts`, `TripSettingsDialog`, and editable Location/Map links. Deleted redundant preview page. |
 | 2026-03-11 | F16 | Enhanced Permissions | Collaborators can now toggle the lock on finalized trips. "Add Event" button is now disabled when a trip is locked. Deletion remains owner-only. |
 | 2026-03-11 | F16 | Dynamic Home Route | Implemented auto-redirection on `/`: defaults to Finalized view if trips exist, falls back to Drafts, or creation view for new users. |
 | 2026-03-11 | B11 | Mobile Sidebar Labels | Fixed issue where sidebar labels and counts were hidden on mobile due to collapsed state logic. |

@@ -18,33 +18,35 @@ import { CollaboratorsDialog } from '@/components/CollaboratorsDialog';
 type DashboardFilter = 'drafts' | 'finalized' | 'archive';
 
 export default function Dashboard() {
-  const { projects, addProject, deleteProject, updateProject, archiveProject, restoreProject, email, isLoading } = useProjectsContext();
+  const { 
+    projects, addProject, deleteProject, updateProject, archiveProject, restoreProject, email, isLoading,
+    hasInitialRedirected, setHasInitialRedirected
+  } = useProjectsContext();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   const location = useLocation();
-  const hasRedirectedRef = useRef(false);
 
   // Dynamic Home Route Redirection
   useEffect(() => {
-    if (isLoading || projects.length === 0 || hasRedirectedRef.current) return;
+    if (isLoading || projects.length === 0 || hasInitialRedirected) return;
     
     // Only redirect if we are on the base root path
     if (location.pathname === '/') {
       const hasFinalized = projects.some(p => p.metadata.is_finalized === true && p.metadata.status !== 'archived');
       
       if (hasFinalized) {
-        hasRedirectedRef.current = true;
+        setHasInitialRedirected(true);
         console.log("[Dashboard] Initial auto-redirect to /finalized");
         navigate('/finalized', { replace: true });
       } else {
         // Mark as redirected even if we stayed on drafts to prevent later jumps
-        hasRedirectedRef.current = true;
+        setHasInitialRedirected(true);
       }
     }
-  }, [isLoading, projects, location.pathname, navigate]);
+  }, [isLoading, projects, location.pathname, navigate, hasInitialRedirected, setHasInitialRedirected]);
 
   const filter: DashboardFilter =
     location.pathname === '/finalized' ? 'finalized' :

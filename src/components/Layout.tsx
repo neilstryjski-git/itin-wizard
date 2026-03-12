@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/AppSidebar';
-import { ExportButton } from '@/components/ExportButton';
 import { EmailPrompt } from '@/components/EmailPrompt';
 import { useProjectsContext } from '@/contexts/ProjectsContext';
 import { Button } from '@/components/ui/button';
@@ -28,7 +27,6 @@ export default function Layout() {
           <div className="flex-1 flex flex-col min-w-0">
             <header className="h-14 flex items-center justify-between border-b px-4 bg-card">
               <SidebarTrigger />
-              {projectId && <ExportButton projectId={projectId} />}
             </header>
             <main className="flex-1 overflow-auto">
               <Outlet />

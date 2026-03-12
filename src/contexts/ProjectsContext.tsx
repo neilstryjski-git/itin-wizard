@@ -19,6 +19,8 @@ interface ProjectsContextType {
   clearEmail: () => void;
   isChangingUser: boolean;
   setIsChangingUser: (val: boolean) => void;
+  hasInitialRedirected: boolean;
+  setHasInitialRedirected: (val: boolean) => void;
 }
 
 const ProjectsContext = createContext<ProjectsContextType | null>(null);
@@ -27,10 +29,12 @@ export function ProjectsProvider({ children }: { children: React.ReactNode }) {
   const { email, setEmail, clearEmail } = useUserEmail();
   const projectsData = useProjects(email);
   const [isChangingUser, setIsChangingUser] = React.useState(false);
+  const [hasInitialRedirected, setHasInitialRedirected] = React.useState(false);
 
   const handleSetEmail = (newEmail: string) => {
     setEmail(newEmail);
     setIsChangingUser(false);
+    setHasInitialRedirected(false); // Reset on user change
   };
 
   return (
@@ -40,7 +44,9 @@ export function ProjectsProvider({ children }: { children: React.ReactNode }) {
       setEmail: handleSetEmail, 
       clearEmail,
       isChangingUser,
-      setIsChangingUser
+      setIsChangingUser,
+      hasInitialRedirected,
+      setHasInitialRedirected
     }}>
       {children}
     </ProjectsContext.Provider>

@@ -1,0 +1,14 @@
+{
+  // itin-wizard (Vite + React SPA) on Cloudflare Workers static assets.
+  // Vercel → Cloudflare migration Phase 3 (vechelon repo: docs/hosting-migration/MIGRATION_LOG.md).
+  // Build: npm run build → dist/ (VITE_SUPABASE_* baked in at build time). Deploy: npx wrangler deploy
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "itin-wizard",
+  "compatibility_date": "2026-09-01",
+  "workers_dev": true,
+  "assets": {
+    "directory": "./dist",
+    // vercel.json: /(.*) → /index.html — every unknown path serves the SPA shell
+    "not_found_handling": "single-page-application"
+  }
+}

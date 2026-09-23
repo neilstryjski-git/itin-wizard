@@ -1,0 +1,2 @@
+# Cloudflare: the SPA fallback lives in wrangler.jsonc (not_found_handling); the Netlify/Lovable _redirects rule loops there.
+_redirects

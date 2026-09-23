@@ -1,7 +1,8 @@
 {
   // itin-wizard (Vite + React SPA) on Cloudflare Workers static assets.
   // Vercel → Cloudflare migration Phase 3 (vechelon repo: docs/hosting-migration/MIGRATION_LOG.md).
-  // Build: npm run build → dist/ (VITE_SUPABASE_* baked in at build time). Deploy: npx wrangler deploy
+  // Deploy: npm run deploy:cloudflare  (builds, drops public/_redirects — its catch-all loops on Cloudflare and
+  // not_found_handling below already does the SPA fallback — then wrangler deploy). VITE_SUPABASE_* baked in at build time.
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "itin-wizard",
   "compatibility_date": "2026-09-01",

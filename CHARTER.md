@@ -36,5 +36,5 @@ Trip Wizard is developed through a pioneering collaboration between **Gemini (Th
 ## 🏗️ Technical Architecture
 *   **Local Linux Sandbox**: The core development environment is a specialized Linux sandbox, allowing for secure, isolated AI tool execution and validation.
 *   **GitHub**: Centralized source control and PR-based workflows for code auditing and versioning.
-*   **Vercel**: Frontend hosting and CI/CD, providing a global edge network for the PWA.
+*   **Cloudflare Workers (static assets)**: Frontend hosting for the PWA on a global edge network (moved from Vercel 2026-09; see `wrangler.jsonc` on the `cloudflare` branch).
 *   **Supabase**: Cloud-native Postgres database, Auth (Email-as-Identity), and Edge Functions for AI document parsing.
